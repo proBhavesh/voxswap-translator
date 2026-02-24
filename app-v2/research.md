@@ -1,8 +1,8 @@
-# RTranslator Codebase Research
+# Codebase Research
 
 ## Overview
 
-RTranslator is a native Android app (Java) for offline speech-to-speech translation using on-device ML models (Whisper STT + NLLB-200 translation + system TTS). It supports 3 modes: Conversation (2 phones via Bluetooth), WalkieTalkie (translate-and-speak), and TextTranslation (type-to-translate).
+This is a native Android app (Java) for offline speech-to-speech translation using on-device ML models (Whisper STT + NLLB-200 translation + system TTS). It supports 3 modes: Conversation (2 phones via Bluetooth), WalkieTalkie (translate-and-speak), and TextTranslation (type-to-translate).
 
 ---
 

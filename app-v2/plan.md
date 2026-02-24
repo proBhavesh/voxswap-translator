@@ -1,6 +1,6 @@
 # VoxSwap UI Conversion Plan
 
-Convert RTranslator's green, multi-mode Android UI into VoxSwap's clean, single-purpose indigo UI.
+Convert the original green, multi-mode Android UI into VoxSwap's clean, single-purpose indigo UI.
 
 ---
 
