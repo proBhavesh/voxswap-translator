@@ -1,0 +1,1 @@
+dmesg | grep -i pci; dmesg | grep -i cyw; dmesg | grep -i broadcom; dmesg | grep -i brcm; ip link show; hciconfig -a; lspci

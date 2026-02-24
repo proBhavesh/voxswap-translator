@@ -1,0 +1,16 @@
+hi gonzalo,
+
+yes, i've received the kits and have been working on integrating the sona if573 chip (the auracast one). ran into some issues though:
+
+- the board doesn't detect the sona module at all — the pcie link between the board and the chip fails to come up
+- the stock yocto image that comes with the board was built for the intel wifi chip, not the sona, so it's missing the drivers, firmware, and device tree config
+- i tried installing firmware manually and modifying the device tree (link speed, reference clock settings) — none of it fixed the pcie issue
+- looks like a full yocto image rebuild using ezurio's software layer is needed to properly support this chip
+
+is there someone from ezurio support that could provide us with a pre-built image for the sona on imx8m plus? that would save a lot of time. i'm also going deeper into their docs on my end.
+
+in the meantime, the intel chip works fine in the same slot so i'm using that to develop and test everything that doesn't require auracast — wifi hotspot, audio streaming, mixing. auracast broadcast is the last piece that depends on the sona.
+
+on the app side, it's almost complete. we're testing the parts we can right now. the other developer (me and him split it) is working on the app, i'm focused on the board software and integration.
+
+will share progress on both this week.

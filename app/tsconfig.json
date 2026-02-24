@@ -4,13 +4,25 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ],
+      "whisper.rn": [
+        "./node_modules/whisper.rn/lib/typescript/index.d.ts"
+      ],
+      "whisper.rn/src/realtime-transcription": [
+        "./node_modules/whisper.rn/lib/typescript/realtime-transcription/index.d.ts"
+      ],
+      "whisper.rn/src/realtime-transcription/adapters/AudioPcmStreamAdapter": [
+        "./node_modules/whisper.rn/lib/typescript/realtime-transcription/adapters/AudioPcmStreamAdapter.d.ts"
+      ]
     }
   },
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
     ".expo/types/**/*.ts",
-    "expo-env.d.ts"
+    "expo-env.d.ts",
+    "nativewind-env.d.ts"
   ]
 }

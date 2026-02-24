@@ -1,0 +1,40 @@
+Hi Omar,
+
+Thank you for reaching out. I'm working on integrating the Sona IF573 (P/N 453-00120, PCIe variant) with a CompuLab UCM-iMX8M-Plus evaluation kit, and I'm running into a PCIe link failure that I haven't been able to resolve.
+
+Here's a summary of the issue and what I've tried:
+
+HARDWARE SETUP
+- Board: CompuLab UCM-iMX8M-Plus (SBEV-UCMIMX8PLUS carrier board)
+- SoC: NXP i.MX8M Plus (Cortex-A53, kernel 6.6.23)
+- OS: Yocto Linux 4.0 (Scarthgap), CompuLab's stock image
+- Module: Sona IF573, P/N 453-00120 (PCIe WiFi + UART Bluetooth)
+- M.2 Slot: P23 (Key E, supports PCIe + SDIO + USB + UART)
+
+THE PROBLEM
+When the Sona IF573 is installed in the M.2 slot, the PCIe physical link never comes up. The kernel logs show: "imx6q-pcie 33800000.pcie: Phy link never came up". The module is completely invisible to the system — no entry in lspci, no wlan0 interface, no dmesg references to brcm/cypress/infineon/cyw.
+
+The Intel AX210 works perfectly in the same slot, confirming the PCIe lanes, power, and reset GPIO are functional.
+
+WHAT I'VE TRIED
+1. Installed Ezurio firmware files from the public GitHub release (LRD-REL-12.103.0.5) to /lib/firmware/cypress/ — PCIe link still fails (firmware loading happens after link training, so this was expected)
+2. Loaded stock brcmfmac kernel driver — it only registered as USB interface driver, doesn't recognize CYW55573 PCIe device ID
+3. Modified device tree to reduce PCIe link speed from Gen 3 to Gen 1 — no effect
+4. Modified device tree to enable PCIe reference clock output (changed fsl,refclk-pad-mode from unused to output) — no effect
+
+WHAT I THINK THE ISSUE IS
+The failure is at the PCIe PHY/electrical level, before any driver or firmware gets involved. My best guesses for root cause:
+- W_DISABLE1# signal: If this M.2 pin is held LOW on the CompuLab board, it would disable the WiFi radio entirely. The AX210 may ignore this pin, but the CYW55573 might fully shut down its PCIe endpoint. I haven't been able to trace this signal on the CompuLab schematics yet.
+- PCIe reset timing: The CYW55573 may need specific reset hold/release timing that the stock iMX8MP PCIe driver doesn't provide.
+- Missing kernel/driver patches: Ezurio's backports package may include PCIe initialization quirks specific to the CYW55573.
+
+WHAT I NEED HELP WITH
+1. Has anyone successfully used the Sona IF573 (453-00120) with a CompuLab iMX8M Plus board? Or is it only tested on the NXP iMX8MP EVK?
+2. Is a full Yocto rebuild with the meta-summit-radio layer required to get the PCIe link up, or should the module at least show up in lspci with stock firmware?
+3. Are there any known hardware requirements for the CYW55573 PCIe initialization (specific reset timing, W_DISABLE pin state, power sequencing) that might differ from the AX210?
+4. Would it be possible to get a pre-built Yocto image or kernel modules for iMX8M Plus that include the backports driver and firmware, so I can rule out software vs hardware issues?
+
+I've reverted the board to the Intel AX210 for now to continue development on other parts of the system. Any guidance on getting the Sona working would be greatly appreciated.
+
+Thanks,
+Bhavesh Choudhary

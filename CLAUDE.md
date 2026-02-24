@@ -1,6 +1,6 @@
 # VoxSwap Translator
 
-Real-time speech-to-speech translation system. Phone app translates speech locally via SeamlessM4T, sends translated audio over WiFi to an iMX8M Plus box that broadcasts via Auracast to unlimited listeners.
+Real-time speech-to-speech translation system. Phone app translates speech locally using a cascaded pipeline (Whisper STT + NLLB-200 translation + Kokoro/Piper TTS), sends translated audio over WiFi to an iMX8M Plus box that broadcasts via Auracast to unlimited listeners.
 
 See @PROJECT.md for full architecture, hardware specs, and build phases.
 
@@ -18,18 +18,19 @@ Two codebases in this monorepo:
 - expo-router (file-based routing)
 - NativeWind (Tailwind CSS for styling)
 - Zustand (state management)
-- Silero VAD (ONNX, ~2MB) for voice activity detection
-- onnxruntime-react-native (ML inference)
-- expo-av / react-native-live-audio-stream (audio capture)
-- UDP sockets (audio streaming), TCP (control/settings)
+- whisper.rn (Whisper STT + built-in VAD via RealtimeTranscriber)
+- onnxruntime-react-native (NLLB-200 translation inference)
+- sherpa-onnx (Kokoro + Piper TTS with native espeak-ng phonemizer)
+- react-native-live-audio-stream (raw PCM audio capture)
+- react-native-tcp-socket (TCP control) + react-native-udp (UDP audio streaming)
 - EAS Build (cloud builds - no local android/ios folders)
 
 ### Commands
-- Install: `cd app && npx expo install`
-- Dev: `cd app && npx expo start`
+- Install: `cd app && pnpm install`
+- Dev: `cd app && pnpm start`
 - Build Android: `cd app && eas build --platform android`
 - Build iOS: `cd app && eas build --platform ios`
-- Lint: `cd app && npx eslint src/`
+- Lint: `cd app && pnpm lint`
 - Typecheck: `cd app && npx tsc --noEmit`
 
 ### Code Style (TypeScript)
@@ -117,11 +118,15 @@ Two codebases in this monorepo:
 - WiFi: Sona IF573 (Wi-Fi 6E)
 - OS: Linux Yocto (kernel 6.4+, BlueZ 5.66+, PipeWire)
 
+## User Context
+- First time with hardware boards — explain embedded/hardware concepts in plain language as they come up
+- Still write production-quality code — only simplify explanations, not the code itself
+
 ## Constraints
 - Fully offline during operation (internet needed for initial model download)
 - Max 3 simultaneous speakers
 - 2 target translation languages per session (configured once, global)
 - Latency target: 2-3 seconds (from end of utterance)
-- Translation model: TBD (cascaded Whisper + NLLB + Piper is proven fallback)
+- Translation pipeline: Whisper Small (STT) → NLLB-200 Distilled 600M (translate) → Kokoro 82M / Piper (TTS)
 - Phone does all heavy processing (VAD + STT + translate + TTS)
 - Box is lightweight (receive + mix via PipeWire + broadcast)

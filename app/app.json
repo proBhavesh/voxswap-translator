@@ -46,7 +46,9 @@
           "resizeMode": "contain",
           "backgroundColor": "#1a1a2e"
         }
-      ]
+      ],
+      "onnxruntime-react-native",
+      "./plugins/with-large-heap"
     ],
     "experiments": {
       "typedRoutes": true

@@ -54,10 +54,11 @@ Speaker Phones (up to 3)              iMX8M Plus Box
 | Component | Spec |
 |-----------|------|
 | SoC | NXP i.MX8M Plus |
-| BT Module | Ezurio Sona IF573 (Infineon CYW55573, BT 6.0) |
-| WiFi | Sona IF573 (Wi-Fi 6E) |
+| WiFi/BT (current) | Intel AX210 (WiFi 6E, BT 5.2 — no Auracast) |
+| WiFi/BT (target) | Ezurio Sona IF573 (Infineon CYW55573, BT 6.0, Auracast capable) |
 | OS | Linux Yocto |
-| Backup BT | Intel AX210 (for non-Auracast use) |
+
+**Sona IF573 status:** PCIe link fails on CompuLab board — needs full Yocto rebuild with Ezurio's meta-summit-radio layer. See `docs/findings.md` for details. Using Intel AX210 for now to develop everything except Auracast. Auracast broadcast module will be integrated when Sona is working.
 
 ## Translation Model - TBD
 
@@ -222,6 +223,9 @@ voxswap/translator/
 ```
 
 ## Engineering Decisions
+
+### onnxruntime-react-native + New Architecture
+`onnxruntime-react-native` uses the old `NativeModules` bridge (`ReactContextBaseJavaModule`) and has no `react-native.config.js` for autolinking. With New Architecture enabled (required by `react-native-reanimated` v4+), `NativeModules.Onnxruntime` is null at runtime. Fix: manually register `OnnxruntimePackage()` in `MainApplication.kt`'s `getPackages()`. Also lazy-import the module in JS (`require()` inside functions, not top-level `import`) to prevent startup crashes.
 
 ### Audio Chunking & VAD
 Silero VAD (ONNX, ~2MB) detects speech vs silence. Models only run when someone is speaking —
