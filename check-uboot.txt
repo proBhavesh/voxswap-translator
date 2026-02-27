@@ -1,0 +1,1 @@
+fw_printenv bsp_bootcmd; echo "---"; fw_printenv loadfdt; echo "---"; fw_printenv boot_fit; echo "---"; fw_printenv mmcboot; echo "---"; fw_printenv loadbootscript; echo "---"; fw_printenv bootscript; echo "---"; fw_printenv loadimage; echo "---"; fw_printenv mmcargs

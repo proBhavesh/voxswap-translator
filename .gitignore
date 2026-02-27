@@ -50,6 +50,12 @@ box/yocto/downloads/
 box/yocto/sstate-cache/
 box/yocto/tmp/
 
+# Large binary/data folders (not for git)
+docs/hardware/
+docs/sona-if573/
+app-v2/app/libs/
+app-v2/app/src/main/assets/kokoro/
+
 # Debug
 *.log
 npm-debug.log*

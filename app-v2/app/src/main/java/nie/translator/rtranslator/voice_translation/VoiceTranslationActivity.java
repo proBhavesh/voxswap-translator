@@ -185,6 +185,12 @@ public class VoiceTranslationActivity extends GeneralActivity {
     }
 
     @Override
+    protected void onDestroy() {
+        stopWalkieTalkieService();
+        super.onDestroy();
+    }
+
+    @Override
     public void onBackPressed() {
         Fragment fragment = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
         if (fragment != null) {

@@ -321,6 +321,12 @@ public abstract class VoiceTranslationService extends GeneralService {
     }
 
     @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        stopSelf();
+        super.onTaskRemoved(rootIntent);
+    }
+
+    @Override
     public synchronized void onDestroy() {
         super.onDestroy();
         // Stop listening to voice
