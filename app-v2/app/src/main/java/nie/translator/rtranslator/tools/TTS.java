@@ -9,6 +9,7 @@ import android.speech.tts.UtteranceProgressListener;
 import android.speech.tts.Voice;
 import androidx.annotation.Nullable;
 
+import java.io.File;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -79,6 +80,13 @@ public class TTS {
     public int speak(CharSequence text, int queueMode, Bundle params, String utteranceId) {
         if (isActive()) {
             return tts.speak(text, queueMode, params, utteranceId);
+        }
+        return TextToSpeech.ERROR;
+    }
+
+    public int synthesizeToFile(CharSequence text, Bundle params, File file, String utteranceId) {
+        if (isActive()) {
+            return tts.synthesizeToFile(text, params, file, utteranceId);
         }
         return TextToSpeech.ERROR;
     }

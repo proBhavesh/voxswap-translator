@@ -42,6 +42,7 @@ import nie.translator.rtranslator.voice_translation.VoiceTranslationService;
 public class WalkieTalkieFragment extends VoiceTranslationFragment implements MicrophoneComunicable {
     private boolean isRecording = false;
     private boolean isMicActivated = false;
+    private boolean isBoxConnected = false;
 
     /* Views */
     private View statusDot;
@@ -163,7 +164,7 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
     public void restoreAttributesFromService() {
         walkieTalkieServiceCommunicator.getAttributes(new VoiceTranslationService.AttributesListener() {
             @Override
-            public void onSuccess(ArrayList<GuiMessage> messages, boolean isMicMute, boolean isAudioMute, boolean isTTSError, boolean isEditTextOpen, boolean isBluetoothHeadsetConnected, boolean isMicAutomatic, boolean isMicActivatedParam, int listeningMic) {
+            public void onSuccess(ArrayList<GuiMessage> messages, boolean isMicMute, boolean isAudioMute, boolean isTTSError, boolean isEditTextOpen, boolean isBluetoothHeadsetConnected, boolean isBoxConnectedParam, boolean isMicAutomatic, boolean isMicActivatedParam, int listeningMic) {
                 /* Set up messages adapter for caption updates */
                 mAdapter = new MessagesAdapter(messages, global, () -> {
                     if (description != null) {
@@ -178,6 +179,7 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
                 }
 
                 isMicActivated = isMicActivatedParam;
+                isBoxConnected = isBoxConnectedParam;
 
                 /* Restore recording state */
                 if (isMicActivatedParam && !isMicMute) {
@@ -250,8 +252,13 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
             micButton.setImageResource(R.drawable.mic_icon);
             micGlow.setBackgroundResource(R.drawable.circle_glow);
             statusText.setText(R.string.tap_to_start);
-            setStatusDotColor(ContextCompat.getColor(requireContext(), R.color.gray_400));
-            statusLabel.setText(R.string.status_ready);
+            if (isBoxConnected) {
+                setStatusDotColor(ContextCompat.getColor(requireContext(), R.color.brand_primary));
+                statusLabel.setText(R.string.status_connected);
+            } else {
+                setStatusDotColor(ContextCompat.getColor(requireContext(), R.color.gray_400));
+                statusLabel.setText(R.string.status_ready);
+            }
         }
     }
 
@@ -394,6 +401,26 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
                         mAdapter.addMessage(message);
                     }
                 }
+            }
+        }
+
+        @Override
+        public void onBoxConnected() {
+            super.onBoxConnected();
+            isBoxConnected = true;
+            if (statusDot != null && statusLabel != null && !isRecording) {
+                setStatusDotColor(ContextCompat.getColor(requireContext(), R.color.brand_primary));
+                statusLabel.setText(R.string.status_connected);
+            }
+        }
+
+        @Override
+        public void onBoxDisconnected() {
+            super.onBoxDisconnected();
+            isBoxConnected = false;
+            if (statusDot != null && statusLabel != null && !isRecording) {
+                setStatusDotColor(ContextCompat.getColor(requireContext(), R.color.gray_400));
+                statusLabel.setText(R.string.status_ready);
             }
         }
 

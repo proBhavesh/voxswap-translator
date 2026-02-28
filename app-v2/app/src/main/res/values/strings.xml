@@ -25,6 +25,7 @@
 
     <!-- Home screen -->
     <string name="status_ready">Ready</string>
+    <string name="status_connected">Connected to Box</string>
     <string name="status_listening">Listening</string>
     <string name="status_translating">Translating…</string>
     <string name="tap_to_start">Tap to start translating</string>
@@ -46,6 +47,7 @@
     <string name="section_models">Models</string>
     <string name="section_about">About</string>
     <string name="connection_ready">Ready</string>
+    <string name="connection_connected">Connected</string>
     <string name="connection_target">Target: 10.0.0.1</string>
     <string name="button_redownload">Re-download Models</string>
     <string name="about_app_name">VoxSwap Translator</string>

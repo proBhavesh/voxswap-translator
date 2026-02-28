@@ -5,6 +5,9 @@ import android.app.Notification;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
+import android.media.AudioTrack;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -13,9 +16,18 @@ import android.os.Messenger;
 import android.os.PowerManager;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
+
 import nie.translator.rtranslator.GeneralService;
 import nie.translator.rtranslator.tools.Timer;
 import nie.translator.rtranslator.tools.CustomLocale;
@@ -51,6 +63,8 @@ public abstract class VoiceTranslationService extends GeneralService {
     public static final int ON_CONNECTED_BLUETOOTH_HEADSET = 15;
     public static final int ON_DISCONNECTED_BLUETOOTH_HEADSET = 16;
     public static final int ON_STOPPED = 6;
+    public static final int ON_BOX_CONNECTED = 30;
+    public static final int ON_BOX_DISCONNECTED = 31;
 
     // permissions
     public static final int REQUEST_CODE_REQUIRED_PERMISSIONS = 3;
@@ -88,6 +102,15 @@ public abstract class VoiceTranslationService extends GeneralService {
     protected boolean manualRecognizingSecondLanguage = false;
     protected boolean manualRecognizingAutoLanguage = false;
 
+    /* synthesizeToFile support: utterance metadata and playback queue */
+    private final AtomicLong utteranceCounter = new AtomicLong(0);
+    private final ConcurrentHashMap<String, CustomLocale> utteranceLanguageMap = new ConcurrentHashMap<>();
+    private final ConcurrentLinkedQueue<PcmAudioData> playbackQueue = new ConcurrentLinkedQueue<>();
+    private final Object playbackLock = new Object();
+    private boolean isPlayingBack = false;
+    @Nullable
+    private AudioTrack currentAudioTrack;
+
 
     @Override
     public void onCreate() {
@@ -109,27 +132,43 @@ public abstract class VoiceTranslationService extends GeneralService {
             }
 
             @Override
-            public void onDone(String s) {
+            public void onDone(String utteranceId) {
+                /* Read the WAV file that synthesizeToFile wrote */
+                File wavFile = new File(getCacheDir(), utteranceId + ".wav");
+                CustomLocale language = utteranceLanguageMap.remove(utteranceId);
+
+                if (wavFile.exists()) {
+                    PcmAudioData pcmData = readWavFile(wavFile);
+                    wavFile.delete();
+
+                    if (pcmData != null) {
+                        pcmData.language = language;
+
+                        /* Notify subclass first — WalkieTalkieService grabs PCM for UDP */
+                        onPcmGenerated(pcmData);
+
+                        /* Queue for sequential local playback */
+                        enqueuePlayback(pcmData);
+                    }
+                }
+
+                /* Existing logic: decrement counter, restart mic if needed */
                 synchronized (mLock) {
                     if (utterancesCurrentlySpeaking > 0) {
                         utterancesCurrentlySpeaking--;
                     }
                     if (utterancesCurrentlySpeaking == 0) {
-                        /*
-                        // start the task because this thread is not allowed to start the Recorder
-                        StartVoiceRecorderTask startVoiceRecorderTask = new StartVoiceRecorderTask();
-                        startVoiceRecorderTask.execute(VoiceTranslationService.this);*/
                         mainHandler.postDelayed(new Runnable() {
                             @Override
                             public void run() {
                                 if (shouldDeactivateMicDuringTTS()) {
-                                    if(!isMicMute) {
+                                    if (!isMicMute) {
                                         startVoiceRecorder();
                                     }
                                     notifyMicActivated();
                                 }
                             }
-                        }, 500);  //4000
+                        }, 500);
                     }
                 }
             }
@@ -246,14 +285,16 @@ public abstract class VoiceTranslationService extends GeneralService {
                 utterancesCurrentlySpeaking++;
                 if (shouldDeactivateMicDuringTTS()) {
                     stopVoiceRecorder();
-                    notifyMicDeactivated();   // we notify the client
+                    notifyMicDeactivated();
                 }
-                if (tts.getVoice() != null && language.equals(new CustomLocale(tts.getVoice().getLocale()))) {
-                    tts.speak(result, TextToSpeech.QUEUE_ADD, null, "c01");
-                } else {
-                    tts.setLanguage(language,this);
-                    tts.speak(result, TextToSpeech.QUEUE_ADD, null, "c01");
-                }
+
+                tts.setLanguage(language, this);
+
+                /* Write to temp WAV file instead of playing directly */
+                String utteranceId = "tts_" + utteranceCounter.getAndIncrement();
+                utteranceLanguageMap.put(utteranceId, language);
+                File wavFile = new File(getCacheDir(), utteranceId + ".wav");
+                tts.synthesizeToFile(result, null, wavFile, utteranceId);
             }
         }
     }
@@ -262,7 +303,166 @@ public abstract class VoiceTranslationService extends GeneralService {
         return true;
     }
 
+    /**
+     * Called when TTS generates PCM audio. Override in WalkieTalkieService
+     * to capture PCM for UDP streaming to box.
+     * Called from a TTS background thread, before local playback starts.
+     */
+    protected void onPcmGenerated(PcmAudioData pcmData) {
+        /* Base class does nothing — subclass hooks in here */
+    }
+
+    /* --- WAV reading --- */
+
+    /**
+     * Reads a WAV file produced by Android TTS synthesizeToFile().
+     * Android's platform (FileSynthesisCallback) always writes a standard 44-byte header:
+     * RIFF (12B) + fmt (24B) + data header (8B) = 44B, followed by raw PCM.
+     * Returns null if the file is invalid or unreadable.
+     */
+    private PcmAudioData readWavFile(File wavFile) {
+        try (FileInputStream fis = new FileInputStream(wavFile)) {
+            byte[] header = new byte[44];
+            if (fis.read(header) < 44) return null;
+
+            /* Verify RIFF/WAVE header */
+            if (header[0] != 'R' || header[1] != 'I' || header[2] != 'F' || header[3] != 'F') {
+                Log.e("VoiceTranslationService", "WAV file missing RIFF header");
+                return null;
+            }
+
+            /* Parse WAV header fields (little-endian) */
+            int channels = (header[22] & 0xFF) | ((header[23] & 0xFF) << 8);
+            int sampleRate = (header[24] & 0xFF) | ((header[25] & 0xFF) << 8)
+                           | ((header[26] & 0xFF) << 16) | ((header[27] & 0xFF) << 24);
+            int dataSize = (header[40] & 0xFF) | ((header[41] & 0xFF) << 8)
+                         | ((header[42] & 0xFF) << 16) | ((header[43] & 0xFF) << 24);
+
+            /* Validate parsed values — reject clearly invalid data */
+            if (channels < 1 || channels > 2 || sampleRate < 8000 || sampleRate > 48000 || dataSize <= 0) {
+                Log.e("VoiceTranslationService", "WAV header has invalid values: channels=" + channels
+                    + " sampleRate=" + sampleRate + " dataSize=" + dataSize);
+                return null;
+            }
+
+            /* Read PCM data */
+            byte[] pcmBytes = new byte[dataSize];
+            int bytesRead = 0;
+            while (bytesRead < dataSize) {
+                int read = fis.read(pcmBytes, bytesRead, dataSize - bytesRead);
+                if (read == -1) break;
+                bytesRead += read;
+            }
+
+            return new PcmAudioData(pcmBytes, sampleRate, channels);
+        } catch (IOException e) {
+            Log.e("VoiceTranslationService", "Failed to read WAV file", e);
+            return null;
+        }
+    }
+
+    /* --- AudioTrack playback queue ---
+     * synthesizeToFile completes faster than real-time, so multiple onDone() callbacks
+     * can fire in quick succession. Without a queue, AudioTracks would overlap.
+     * Each track's completion callback triggers the next one in the queue.
+     */
+
+    private void enqueuePlayback(PcmAudioData pcmData) {
+        playbackQueue.add(pcmData);
+        playNext();
+    }
+
+    private void playNext() {
+        synchronized (playbackLock) {
+            if (isPlayingBack) return;
+            PcmAudioData pcmData = playbackQueue.poll();
+            if (pcmData == null) return;
+
+            isPlayingBack = true;
+
+            int channelConfig = (pcmData.channels == 1)
+                ? AudioFormat.CHANNEL_OUT_MONO
+                : AudioFormat.CHANNEL_OUT_STEREO;
+
+            AudioTrack audioTrack = new AudioTrack.Builder()
+                .setAudioAttributes(new AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_MEDIA)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                    .build())
+                .setAudioFormat(new AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(pcmData.sampleRate)
+                    .setChannelMask(channelConfig)
+                    .build())
+                .setBufferSizeInBytes(pcmData.pcmBytes.length)
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .build();
+
+            audioTrack.write(pcmData.pcmBytes, 0, pcmData.pcmBytes.length);
+
+            /* Marker at end of audio — fires when playback finishes */
+            int totalFrames = pcmData.pcmBytes.length / (2 * pcmData.channels);
+            audioTrack.setNotificationMarkerPosition(totalFrames);
+            audioTrack.setPlaybackPositionUpdateListener(new AudioTrack.OnPlaybackPositionUpdateListener() {
+                @Override
+                public void onMarkerReached(AudioTrack track) {
+                    synchronized (playbackLock) {
+                        track.stop();
+                        track.release();
+                        currentAudioTrack = null;
+                        isPlayingBack = false;
+                    }
+                    playNext();
+                }
+                @Override
+                public void onPeriodicNotification(AudioTrack track) {}
+            });
+
+            currentAudioTrack = audioTrack;
+            audioTrack.play();
+        }
+    }
+
+    /**
+     * Stops any in-progress playback and discards all queued audio.
+     * Called on STOP_SOUND command and in onDestroy().
+     */
+    private void stopPlayback() {
+        synchronized (playbackLock) {
+            playbackQueue.clear();
+            if (currentAudioTrack != null) {
+                try {
+                    currentAudioTrack.stop();
+                } catch (IllegalStateException ignored) {
+                    /* AudioTrack may already be stopped */
+                }
+                currentAudioTrack.release();
+                currentAudioTrack = null;
+            }
+            isPlayingBack = false;
+        }
+    }
+
+    /* --- PCM audio data --- */
+
+    protected static class PcmAudioData {
+        public final byte[] pcmBytes;    /* raw 16-bit PCM, little-endian */
+        public final int sampleRate;     /* e.g. 22050 or 24000 */
+        public final int channels;       /* 1 = mono (always mono from Android TTS) */
+        public CustomLocale language;    /* which language this audio is for */
+
+        public PcmAudioData(byte[] pcmBytes, int sampleRate, int channels) {
+            this.pcmBytes = pcmBytes;
+            this.sampleRate = sampleRate;
+            this.channels = channels;
+        }
+    }
+
     protected boolean isBluetoothHeadsetConnected() {
+        return false;
+    }
+
+    protected boolean isBoxConnected() {
         return false;
     }
 
@@ -335,7 +535,9 @@ public abstract class VoiceTranslationService extends GeneralService {
             mVoiceRecorder.destroy();
             mVoiceRecorder = null;
         }
-        //stop tts
+        //stop tts and audio playback
+        stopPlayback();
+        utteranceLanguageMap.clear();
         if(tts != null) {
             tts.stop();
             tts.shutdown();
@@ -413,6 +615,9 @@ public abstract class VoiceTranslationService extends GeneralService {
                         if(tts != null) {
                             tts.stop();
                         }
+                        /* Clean up pending playback and orphaned metadata from cancelled synthesis */
+                        stopPlayback();
+                        utteranceLanguageMap.clear();
                         ttsListener.onDone("");
                     }
                     return true;
@@ -428,6 +633,7 @@ public abstract class VoiceTranslationService extends GeneralService {
                     bundle.putBoolean("isTTSError", tts == null);
                     bundle.putBoolean("isEditTextOpen", isEditTextOpen);
                     bundle.putBoolean("isBluetoothHeadsetConnected", isBluetoothHeadsetConnected());
+                    bundle.putBoolean("isBoxConnected", isBoxConnected());
                     bundle.putBoolean("isMicAutomatic", isMicAutomatic);
                     bundle.putBoolean("isMicActivated", isMicActivated);
                     if(mVoiceRecorder != null && mVoiceRecorder.isRecording()){
@@ -527,11 +733,12 @@ public abstract class VoiceTranslationService extends GeneralService {
                         boolean isTTSError = data.getBoolean("isTTSError");
                         boolean isEditTextOpen = data.getBoolean("isEditTextOpen");
                         boolean isBluetoothHeadsetConnected = data.getBoolean("isBluetoothHeadsetConnected");
+                        boolean isBoxConnected = data.getBoolean("isBoxConnected");
                         boolean isMicAutomatic = data.getBoolean("isMicAutomatic");
                         boolean isMicActivated = data.getBoolean("isMicActivated");
                         int listeningMic = data.getInt("listeningMic");
                         while (!attributesListeners.isEmpty()) {
-                            attributesListeners.remove(0).onSuccess(messages, isMicMute, isAudioMute, isTTSError, isEditTextOpen, isBluetoothHeadsetConnected, isMicAutomatic, isMicActivated, listeningMic);
+                            attributesListeners.remove(0).onSuccess(messages, isMicMute, isAudioMute, isTTSError, isEditTextOpen, isBluetoothHeadsetConnected, isBoxConnected, isMicAutomatic, isMicActivated, listeningMic);
                         }
                         return true;
                     }
@@ -591,6 +798,18 @@ public abstract class VoiceTranslationService extends GeneralService {
                         long value = data.getLong("value");
                         for (int i = 0; i < clientCallbacks.size(); i++) {
                             clientCallbacks.get(i).onError(reasons, value);
+                        }
+                        return true;
+                    }
+                    case ON_BOX_CONNECTED: {
+                        for (int i = 0; i < clientCallbacks.size(); i++) {
+                            clientCallbacks.get(i).onBoxConnected();
+                        }
+                        return true;
+                    }
+                    case ON_BOX_DISCONNECTED: {
+                        for (int i = 0; i < clientCallbacks.size(); i++) {
+                            clientCallbacks.get(i).onBoxDisconnected();
                         }
                         return true;
                     }
@@ -693,10 +912,16 @@ public abstract class VoiceTranslationService extends GeneralService {
 
         public void onBluetoothHeadsetDisconnected() {
         }
+
+        public void onBoxConnected() {
+        }
+
+        public void onBoxDisconnected() {
+        }
     }
 
     public interface AttributesListener {
-        void onSuccess(ArrayList<GuiMessage> messages, boolean isMicMute, boolean isAudioMute, boolean isTTSError, boolean isEditTextOpen, boolean isBluetoothHeadsetConnected, boolean isMicAutomatic, boolean isMicActivated, int listeningMic);
+        void onSuccess(ArrayList<GuiMessage> messages, boolean isMicMute, boolean isAudioMute, boolean isTTSError, boolean isEditTextOpen, boolean isBluetoothHeadsetConnected, boolean isBoxConnected, boolean isMicAutomatic, boolean isMicActivated, int listeningMic);
     }
 
     protected abstract class VoiceTranslationServiceRecognizerListener implements RecognizerListener {

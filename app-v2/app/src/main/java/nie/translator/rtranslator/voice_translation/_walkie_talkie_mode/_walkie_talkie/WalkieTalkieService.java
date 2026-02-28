@@ -1,6 +1,9 @@
 package nie.translator.rtranslator.voice_translation._walkie_talkie_mode._walkie_talkie;
 
+import android.content.Context;
 import android.content.Intent;
+import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
@@ -18,11 +21,17 @@ import nie.translator.rtranslator.voice_translation.neural_networks.translation.
 import nie.translator.rtranslator.voice_translation.neural_networks.voice.Recognizer;
 import nie.translator.rtranslator.voice_translation.neural_networks.voice.RecognizerListener;
 import nie.translator.rtranslator.voice_translation.neural_networks.voice.Recorder;
+import nie.translator.rtranslator.voice_translation.networking.AudioStreamer;
+import nie.translator.rtranslator.voice_translation.networking.BoxConnection;
 
 
 public class WalkieTalkieService extends VoiceTranslationService {
     public static final int SPEECH_BEAM_SIZE = 1;
     public static final int TRANSLATOR_BEAM_SIZE = 1;
+
+    /* Box networking — box is the WiFi hotspot gateway, so its address is always known */
+    private static final String BOX_HOST = "10.0.0.1";
+    private static final int BOX_TCP_PORT = 7700;
 
     /* Commands */
     public static final int GET_FIRST_LANGUAGE = 24;
@@ -41,6 +50,11 @@ public class WalkieTalkieService extends VoiceTranslationService {
     private RecognizerListener speechRecognizerCallback;
     private Translator.TranslateListener target1TranslateListener;
     private Translator.TranslateListener target2TranslateListener;
+
+    /* Networking — box connection + audio streaming */
+    private BoxConnection boxConnection;
+    private AudioStreamer audioStreamer;
+    private WifiManager.WifiLock wifiLock;
 
 
     @Override
@@ -198,6 +212,35 @@ public class WalkieTalkieService extends VoiceTranslationService {
             }
         };
 
+        /* Initialize networking — box connection + audio streamer */
+        audioStreamer = new AudioStreamer();
+        boxConnection = new BoxConnection(new BoxConnection.ConnectionListener() {
+            @Override
+            public void onConnected(int speakerId) {
+                audioStreamer.start(BOX_HOST, speakerId);
+                notifyConnectionStatus(true);
+                Log.d("VoxSwap", "Connected to box, speaker_id=" + speakerId);
+            }
+
+            @Override
+            public void onDisconnected() {
+                audioStreamer.stop();
+                notifyConnectionStatus(false);
+                Log.d("VoxSwap", "Disconnected from box");
+            }
+
+            @Override
+            public void onConnectionError(String reason) {
+                Log.w("VoxSwap", "Box connection error: " + reason);
+            }
+        });
+
+        /* Keep WiFi radio active when screen is off — prevents silent UDP stream drops */
+        WifiManager wm = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "VoxSwap:wifiLock");
+        wifiLock.setReferenceCounted(false);
+        wifiLock.acquire();
+
         initializeVoiceRecorder();
     }
 
@@ -223,8 +266,19 @@ public class WalkieTalkieService extends VoiceTranslationService {
 
         if (isFirstStart) {
             speechRecognizer.addCallback(speechRecognizerCallback);
+
+            /* Connect to box — runs on background thread, doesn't block */
+            if (sourceLanguage != null) {
+                String speakerName = Build.MODEL;
+                boxConnection.connect(BOX_HOST, BOX_TCP_PORT, speakerName, sourceLanguage.getCode());
+            }
         }
         return super.onStartCommand(intent, flags, startId);
+    }
+
+    @Override
+    protected boolean isBoxConnected() {
+        return boxConnection != null && boxConnection.isConnected();
     }
 
     @Override
@@ -234,9 +288,38 @@ public class WalkieTalkieService extends VoiceTranslationService {
     }
 
     @Override
+    protected void onPcmGenerated(PcmAudioData pcmData) {
+        if (audioStreamer == null || !audioStreamer.isActive()) return;
+
+        /* Determine stream type using equalsLanguage() — CustomLocale.equals() returns false
+         * if getCountry() is null, even for the same language. equalsLanguage() compares
+         * only ISO3 language codes, which is correct for stream type detection. */
+        int streamType;
+        if (pcmData.language != null && pcmData.language.equalsLanguage(targetLanguage1)) {
+            streamType = 1;
+        } else if (pcmData.language != null && pcmData.language.equalsLanguage(targetLanguage2)) {
+            streamType = 2;
+        } else {
+            Log.w("VoxSwap", "PCM generated for unknown language, skipping stream");
+            return;
+        }
+
+        audioStreamer.streamTtsAudio(pcmData.pcmBytes, pcmData.sampleRate, streamType);
+    }
+
+    @Override
     public void onDestroy() {
+        if (boxConnection != null) boxConnection.disconnect();
+        if (audioStreamer != null) audioStreamer.stop();
+        if (wifiLock != null && wifiLock.isHeld()) wifiLock.release();
         speechRecognizer.removeCallback(speechRecognizerCallback);
         super.onDestroy();
+    }
+
+    private void notifyConnectionStatus(boolean connected) {
+        Bundle bundle = new Bundle();
+        bundle.putInt("callback", connected ? ON_BOX_CONNECTED : ON_BOX_DISCONNECTED);
+        WalkieTalkieService.super.notifyToClient(bundle);
     }
 
     private void translateToTarget1(String text) {
