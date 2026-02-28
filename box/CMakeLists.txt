@@ -18,6 +18,10 @@ add_compile_options(
     -Wdouble-promotion
 )
 
+# POSIX feature test macro — exposes clock_gettime, sigaction, etc.
+# Required because CMAKE_C_EXTENSIONS is OFF (no implicit _GNU_SOURCE).
+add_compile_definitions(_POSIX_C_SOURCE=200809L)
+
 # Debug/Release flags
 set(CMAKE_C_FLAGS_DEBUG "-g -O0 -DDEBUG")
 set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")

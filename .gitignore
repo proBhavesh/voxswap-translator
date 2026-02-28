@@ -50,11 +50,14 @@ box/yocto/downloads/
 box/yocto/sstate-cache/
 box/yocto/tmp/
 
+# Archive (old plans, deprecated apps)
+archive/
+
 # Large binary/data folders (not for git)
 docs/hardware/
 docs/sona-if573/
-app-v2/app/libs/
-app-v2/app/src/main/assets/kokoro/
+app/app/libs/
+app/app/src/main/assets/kokoro/
 
 # Debug
 *.log
