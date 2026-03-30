@@ -1,0 +1,81 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# EAS
+*.tar.gz
+*.tgz
+
+# Native builds (EAS cloud builds, not local)
+app/android/
+app/ios/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# ONNX models (downloaded at runtime, not committed)
+app/assets/models/*.onnx
+
+# C build artifacts
+box/build/
+*.o
+*.so
+*.a
+*.d
+
+# Yocto build
+box/yocto/build/
+box/yocto/downloads/
+box/yocto/sstate-cache/
+box/yocto/tmp/
+
+# Archive (old plans, deprecated apps)
+archive/
+
+# Large binary/data folders (not for git)
+docs/hardware/
+docs/sona-if573/
+app/app/libs/
+app/app/src/main/assets/kokoro/
+
+# Playwright MCP (browser automation cache)
+.playwright-mcp/
+
+# Internal dev files (not for client)
+CLAUDE.md
+PROJECT.md
+TODO.md
+chat.txt
+check-uboot.txt
+reply.txt
+docs/
+
+# Icon source files
+app/icon-source.svg
+
+# Debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*

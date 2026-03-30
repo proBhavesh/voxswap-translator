@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.Speech" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="color">@color/brand_primary</item>
+        <item name="colorPrimaryDark">@color/brand_primary_dark</item>
+        <item name="colorAccent">@color/brand_accent</item>
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@color/bg_primary</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="cardViewStyle">@style/CardView</item>
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay.v14.Material</item>
+    </style>
+
+    <style name="Theme.Settings" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="color">@color/brand_primary</item>
+        <item name="colorPrimaryDark">@color/brand_primary_dark</item>
+        <item name="colorAccent">@color/brand_accent</item>
+        <item name="colorPrimary">@color/brand_primary</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@color/bg_primary</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="cardViewStyle">@style/CardView</item>
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay.v14.Material</item>
+    </style>
+
+    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar" />
+
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen.IconBackground">
+        <item name="windowSplashScreenBackground">@android:color/white</item>
+        <item name="windowSplashScreenIconBackgroundColor">@android:color/white</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_screen2</item>
+        <item name="postSplashScreenTheme">@style/Theme.Speech</item>
+    </style>
+
+    <style name="Theme.Toolbar" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+    </style>
+
+    <style name="Theme.TabLayout" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">sans-serif-light</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+    </style>
+
+    <style name="CustomCardViewStyle" parent="@style/Widget.MaterialComponents.CardView">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearanceOverlay_card_custom_corners</item>
+    </style>
+
+    <style name="ShapeAppearanceOverlay_card_custom_corners" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopRight">24dp</item>
+        <item name="cornerSizeTopLeft">24dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+    </style>
+</resources>
