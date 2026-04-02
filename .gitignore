@@ -1,3 +1,6 @@
+# Test app (standalone diagnostic APK)
+android/test_app/
+
 # Dependencies
 node_modules/
 .pnpm-store/
@@ -12,8 +15,8 @@ web-build/
 *.tgz
 
 # Native builds (EAS cloud builds, not local)
-app/android/
-app/ios/
+android/app/android/
+android/app/ios/
 
 # Environment
 .env
@@ -35,44 +38,49 @@ Thumbs.db
 *.tsbuildinfo
 
 # ONNX models (downloaded at runtime, not committed)
-app/assets/models/*.onnx
+android/app/assets/models/*.onnx
 
 # C build artifacts
-box/build/
+android/box/build/
 *.o
 *.so
 *.a
 *.d
 
 # Yocto build
-box/yocto/build/
-box/yocto/downloads/
-box/yocto/sstate-cache/
-box/yocto/tmp/
+android/box/yocto/build/
+android/box/yocto/downloads/
+android/box/yocto/sstate-cache/
+android/box/yocto/tmp/
 
 # Archive (old plans, deprecated apps)
-archive/
+android/archive/
 
 # Large binary/data folders (not for git)
-docs/hardware/
-docs/sona-if573/
-app/app/libs/
-app/app/src/main/assets/kokoro/
+android/docs/hardware/
+android/docs/sona-if573/
+android/app/app/libs/
+android/app/app/src/main/assets/kokoro/
 
 # Playwright MCP (browser automation cache)
 .playwright-mcp/
 
 # Internal dev files (not for client)
 CLAUDE.md
+android/CLAUDE.md
+jetson/CLAUDE.md
 PROJECT.md
+android/PROJECT.md
 TODO.md
+android/TODO.md
 chat.txt
-check-uboot.txt
-reply.txt
-docs/
+android/check-uboot.txt
+android/reply.txt
+android/multi-output-audio-summary.txt
+android/docs/
 
 # Icon source files
-app/icon-source.svg
+android/app/icon-source.svg
 
 # Debug
 *.log
