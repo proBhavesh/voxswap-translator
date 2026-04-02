@@ -66,9 +66,6 @@ android/app/app/src/main/assets/kokoro/
 .playwright-mcp/
 
 # Internal dev files (not for client)
-CLAUDE.md
-android/CLAUDE.md
-jetson/CLAUDE.md
 PROJECT.md
 android/PROJECT.md
 TODO.md
