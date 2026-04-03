@@ -52,7 +52,6 @@ public class Recognizer extends NeuralNetworkApi {
     private ArrayList<RecognizerMultiListener> multiCallbacks = new ArrayList<>();
     private boolean recognizing = false;
     private ArrayDeque<DataContainer> dataToRecognize = new ArrayDeque<>();
-    private static final int MAX_QUEUE_SIZE = 3;
     private final Object lock = new Object();
 
     private static final String[] LANGUAGES = {
@@ -77,9 +76,9 @@ public class Recognizer extends NeuralNetworkApi {
         this.global = global;
 
         String filesDir = global.getFilesDir().getPath();
-        String encoderPath = filesDir + "/small-encoder.int8.onnx";
-        String decoderPath = filesDir + "/small-decoder.int8.onnx";
-        String tokensPath = filesDir + "/small-tokens.txt";
+        String encoderPath = filesDir + "/base-encoder.int8.onnx";
+        String decoderPath = filesDir + "/base-decoder.int8.onnx";
+        String tokensPath = filesDir + "/base-tokens.txt";
 
         new Thread("recognizer-init") {
             @Override
@@ -90,7 +89,7 @@ public class Recognizer extends NeuralNetworkApi {
                     offlineRecognizer = createRecognizer(encoderPath, decoderPath, tokensPath, "en");
                     currentLanguage = "en";
 
-                    Log.i("performance", "sherpa-onnx Whisper Small loaded in " +
+                    Log.i("performance", "sherpa-onnx Whisper Tiny loaded in " +
                             (System.currentTimeMillis() - startTime) + "ms");
 
                     initListener.onInitializationFinished();
@@ -103,7 +102,7 @@ public class Recognizer extends NeuralNetworkApi {
     }
 
     /**
-     * Recognizes the speech audio using sherpa-onnx Whisper Small.
+     * Recognizes the speech audio using sherpa-onnx Whisper Tiny.
      */
     public void recognize(final float[] data, int beamSize, final String languageCode) {
         new Thread("recognizer"){
@@ -114,10 +113,6 @@ public class Recognizer extends NeuralNetworkApi {
                     Log.e("recognizer","recognizingCalled");
                     if (data != null) {
                         dataToRecognize.addLast(new DataContainer(data, beamSize, languageCode));
-                        while (dataToRecognize.size() > MAX_QUEUE_SIZE) {
-                            dataToRecognize.pollFirst();
-                            Log.w("Recognizer", "STT queue overflow, dropping oldest segment");
-                        }
                         if (dataToRecognize.size() >= 1 && !recognizing) {
                             recognize();
                         }
@@ -136,10 +131,6 @@ public class Recognizer extends NeuralNetworkApi {
                     Log.e("recognizer","recognizingCalled");
                     if (data != null) {
                         dataToRecognize.addLast(new DataContainer(data, beamSize, languageCode1, languageCode2));
-                        while (dataToRecognize.size() > MAX_QUEUE_SIZE) {
-                            dataToRecognize.pollFirst();
-                            Log.w("Recognizer", "STT queue overflow, dropping oldest segment");
-                        }
                         if (dataToRecognize.size() >= 1 && !recognizing) {
                             recognize();
                         }
@@ -246,9 +237,9 @@ public class Recognizer extends NeuralNetworkApi {
             offlineRecognizer.release();
         }
         offlineRecognizer = createRecognizer(
-                filesDir + "/small-encoder.int8.onnx",
-                filesDir + "/small-decoder.int8.onnx",
-                filesDir + "/small-tokens.txt",
+                filesDir + "/base-encoder.int8.onnx",
+                filesDir + "/base-decoder.int8.onnx",
+                filesDir + "/base-tokens.txt",
                 languageCode
         );
         currentLanguage = languageCode;
@@ -264,9 +255,6 @@ public class Recognizer extends NeuralNetworkApi {
 
         correctedText = correctedText.trim();
 
-        /* Collapse repeated phrases — Whisper hallucinates "X. X. X." on noisy input */
-        correctedText = deduplicateRepeats(correctedText);
-
         if(correctedText.length() >= 2) {
             char firstChar = correctedText.charAt(0);
             if (Character.isLowerCase(firstChar)) {
@@ -277,79 +265,6 @@ public class Recognizer extends NeuralNetworkApi {
             correctedText = correctedText.replace("...", "");
         }
         return correctedText;
-    }
-
-    /**
-     * Detect and collapse repeated phrases in STT output.
-     * Checks phrase lengths from 1 to 10 words. If the same phrase
-     * repeats 3+ times consecutively, collapses to a single occurrence.
-     */
-    private String deduplicateRepeats(String text) {
-        if (text == null || text.isEmpty()) return text;
-
-        String[] words = text.split("\\s+");
-        if (words.length < 3) return text;
-
-        /* Try phrase lengths from 1 word up to 10 words */
-        for (int phraseLen = 1; phraseLen <= Math.min(10, words.length / 3); phraseLen++) {
-            int i = 0;
-            StringBuilder result = new StringBuilder();
-            boolean foundRepeat = false;
-
-            while (i < words.length) {
-                /* Build candidate phrase of phraseLen words starting at i */
-                if (i + phraseLen > words.length) {
-                    for (int j = i; j < words.length; j++) {
-                        if (result.length() > 0) result.append(" ");
-                        result.append(words[j]);
-                    }
-                    break;
-                }
-
-                StringBuilder phrase = new StringBuilder();
-                for (int j = i; j < i + phraseLen; j++) {
-                    if (phrase.length() > 0) phrase.append(" ");
-                    phrase.append(words[j]);
-                }
-                String phraseStr = phrase.toString();
-
-                /* Count consecutive repetitions */
-                int repeatCount = 1;
-                int nextStart = i + phraseLen;
-                while (nextStart + phraseLen <= words.length) {
-                    StringBuilder nextPhrase = new StringBuilder();
-                    for (int j = nextStart; j < nextStart + phraseLen; j++) {
-                        if (nextPhrase.length() > 0) nextPhrase.append(" ");
-                        nextPhrase.append(words[j]);
-                    }
-                    if (nextPhrase.toString().equalsIgnoreCase(phraseStr)) {
-                        repeatCount++;
-                        nextStart += phraseLen;
-                    } else {
-                        break;
-                    }
-                }
-
-                if (repeatCount >= 3) {
-                    /* Collapse to single occurrence */
-                    if (result.length() > 0) result.append(" ");
-                    result.append(phraseStr);
-                    i = nextStart;
-                    foundRepeat = true;
-                } else {
-                    if (result.length() > 0) result.append(" ");
-                    result.append(words[i]);
-                    i++;
-                }
-            }
-
-            if (foundRepeat) {
-                Log.i("Recognizer", "Dedup collapsed repeated phrase (len=" + phraseLen + "): " + text + " → " + result);
-                return result.toString();
-            }
-        }
-
-        return text;
     }
 
     /* Whisper supports all 99 languages — filter by quality threshold */

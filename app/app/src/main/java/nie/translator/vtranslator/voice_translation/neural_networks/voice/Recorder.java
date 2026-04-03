@@ -60,15 +60,13 @@ public class Recorder {
     public static final int DEFAULT_AMPLITUDE_THRESHOLD = 2000; //original: 1500
     public static final int MIN_AMPLITUDE_THRESHOLD = 400;
     public static final int MAX_SPEECH_TIMEOUT_MILLIS = 5000;
-    public static final int DEFAULT_SPEECH_TIMEOUT_MILLIS = 500; //original: 2000
+    public static final int DEFAULT_SPEECH_TIMEOUT_MILLIS = 700; //original: 2000
     public static final int MIN_SPEECH_TIMEOUT_MILLIS = 100;
     public static final int MAX_PREV_VOICE_DURATION = 1800;
     public static final int DEFAULT_PREV_VOICE_DURATION = 1300;
     public static final int MIN_PREV_VOICE_DURATION = 100;
     private static final int MAX_SPEECH_LENGTH_MILLIS = 8 * 1000; //original: 30 * 1000
-    private static final int MIN_SPEECH_MS = 500;
-    private static final float SILERO_THRESHOLD = 0.3f;
-    private static final float SILERO_END_THRESHOLD = 0.15f;
+    private static final float SILERO_THRESHOLD = 0.5f;
     private final Callback mCallback;
     private int sampleRate;
     @Nullable
@@ -227,18 +225,6 @@ public class Recorder {
     public void end() {
         //convert the relevant portion of the circular mBuffer to a normal array
         int voiceLength = getMBufferRangeSize(startVoiceIndex, tailIndex);
-
-        /* Reject segments shorter than MIN_SPEECH_MS — prevents Whisper hallucination on noise blips */
-        float durationMs = (float) voiceLength / sampleRate * 1000f;
-        if (durationMs < MIN_SPEECH_MS) {
-            Log.i("performance", "VAD: discarding short segment (" + durationMs + "ms)");
-            startVoiceIndex = 0;
-            mLastVoiceHeardMillis = Long.MAX_VALUE;
-            if (sileroVad != null) sileroVad.resetStates();
-            mCallback.onVoiceEnd();
-            return;
-        }
-
         float[] data = new float[voiceLength];
         int circularIndex = startVoiceIndex;
         for(int i=0; i<voiceLength; i++){
@@ -512,16 +498,7 @@ public class Recorder {
             frame[i] = buffer[idx];
         }
         float probability = sileroVad.predict(frame);
-
-        /* Hysteresis: use lower threshold to end speech than to start it.
-         * Prevents rapid start/stop flapping when probability oscillates near threshold.
-         * Pattern from HF speech-to-speech VAD/vad_iterator.py (threshold - 0.15). */
-        boolean currentlyInSpeech = (mLastVoiceHeardMillis != Long.MAX_VALUE);
-        if (currentlyInSpeech) {
-            return probability > SILERO_END_THRESHOLD;
-        } else {
-            return probability > SILERO_THRESHOLD;
-        }
+        return probability > SILERO_THRESHOLD;
     }
 
     private void notifyVolumeLevel(float[] buffer, int begin, int end) {

@@ -28,19 +28,18 @@ import nie.translator.vtranslator.tools.FileTools;
 import nie.translator.vtranslator.voice_translation.neural_networks.NeuralNetworkApi;
 
 public class DownloadFragment extends Fragment {
-    private static final String NLLB_BASE = "https://github.com/proBhavesh/voxswap-translator/releases/download/models-v1/";
-    private static final String WHISPER_BASE = "https://github.com/proBhavesh/voxswap-translator/releases/download/models-v2/";
+    private static final String MODELS_BASE = "https://github.com/proBhavesh/voxswap-translator/releases/download/models-v1/";
     public static final String PIPER_BASE = "https://github.com/proBhavesh/voxswap-translator/releases/download/piper-tts-voices/";
 
-    /* Core models downloaded on first launch — NLLB + Whisper Small + English Piper voice */
+    /* Core models downloaded on first launch — NLLB + Whisper + English Piper voice */
     public static final String[] DOWNLOAD_URLS = {
-            NLLB_BASE + "NLLB_cache_initializer.onnx",
-            NLLB_BASE + "NLLB_decoder.onnx",
-            NLLB_BASE + "NLLB_embed_and_lm_head.onnx",
-            NLLB_BASE + "NLLB_encoder.onnx",
-            WHISPER_BASE + "small-encoder.int8.onnx",
-            WHISPER_BASE + "small-decoder.int8.onnx",
-            WHISPER_BASE + "small-tokens.txt",
+            MODELS_BASE + "NLLB_cache_initializer.onnx",
+            MODELS_BASE + "NLLB_decoder.onnx",
+            MODELS_BASE + "NLLB_embed_and_lm_head.onnx",
+            MODELS_BASE + "NLLB_encoder.onnx",
+            MODELS_BASE + "base-encoder.int8.onnx",
+            MODELS_BASE + "base-decoder.int8.onnx",
+            MODELS_BASE + "base-tokens.txt",
             PIPER_BASE + "en_US-lessac-medium.onnx",
     };
     public static final String[] DOWNLOAD_NAMES = {
@@ -48,9 +47,9 @@ public class DownloadFragment extends Fragment {
             "NLLB_decoder.onnx",
             "NLLB_embed_and_lm_head.onnx",
             "NLLB_encoder.onnx",
-            "small-encoder.int8.onnx",
-            "small-decoder.int8.onnx",
-            "small-tokens.txt",
+            "base-encoder.int8.onnx",
+            "base-decoder.int8.onnx",
+            "base-tokens.txt",
             "en_US-lessac-medium.onnx",
     };
     public static final int[] DOWNLOAD_SIZES = {
@@ -58,9 +57,9 @@ public class DownloadFragment extends Fragment {
             171000,  /* NLLB_decoder */
             500000,  /* NLLB_embed_and_lm_head */
             254000,  /* NLLB_encoder */
-            108000,  /* small-encoder.int8 (108 MB) */
-            251000,  /* small-decoder.int8 (251 MB) */
-            798,     /* small-tokens.txt */
+            28000,   /* base-encoder.int8 */
+            125000,  /* base-decoder.int8 */
+            798,     /* base-tokens.txt */
             63000,   /* en_US-lessac-medium (English Piper voice) */
     };
     private static final long INTERVAL_TIME_FOR_GUI_UPDATES_MS = 500;
