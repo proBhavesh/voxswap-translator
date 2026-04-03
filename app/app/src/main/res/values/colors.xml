@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand -->
+    <color name="brand_primary">#4F46E5</color>
+    <color name="brand_primary_light">#6366F1</color>
+    <color name="brand_primary_dark">#4338CA</color>
+    <color name="brand_accent">#0EA5E9</color>
+
+    <!-- Legacy aliases (referenced by existing code until fully migrated) -->
+    <color name="primary">#4F46E5</color>
+    <color name="primary_dark">#4338CA</color>
+    <color name="primary_very_dark">#312E81</color>
+    <color name="primary_lite">#6366F1</color>
+    <color name="primary_very_lite">#EEF2FF</color>
+    <color name="accent">#0EA5E9</color>
+
+    <!-- Text -->
+    <color name="text_primary">#111827</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_muted">#9CA3AF</color>
+    <color name="text_inverse">#FFFFFF</color>
+
+    <!-- Backgrounds -->
+    <color name="bg_primary">#FFFFFF</color>
+    <color name="bg_secondary">#F9FAFB</color>
+    <color name="bg_card">#F3F4F6</color>
+
+    <!-- Status -->
+    <color name="status_success">#16A34A</color>
+    <color name="status_success_muted">#DCFCE7</color>
+    <color name="status_error">#DC2626</color>
+    <color name="status_error_muted">#FEE2E2</color>
+    <color name="status_warning">#D97706</color>
+    <color name="status_warning_muted">#FEF3C7</color>
+
+    <!-- Borders -->
+    <color name="border_light">#F3F4F6</color>
+    <color name="border_default">#E5E7EB</color>
+
+    <!-- Grays -->
+    <color name="gray_50">#F9FAFB</color>
+    <color name="gray_100">#F3F4F6</color>
+    <color name="gray_200">#E5E7EB</color>
+    <color name="gray_300">#D1D5DB</color>
+    <color name="gray_400">#9CA3AF</color>
+    <color name="gray_500">#6B7280</color>
+    <color name="gray_700">#374151</color>
+    <color name="gray_900">#111827</color>
+
+    <!-- Legacy gray aliases -->
+    <color name="black">#111827</color>
+    <color name="light_black">#374151</color>
+    <color name="very_very_dark_gray">#4B5563</color>
+    <color name="very_dark_gray">#6B7280</color>
+    <color name="dark_gray">#9CA3AF</color>
+    <color name="gray">#9CA3AF</color>
+    <color name="light_gray">#D1D5DB</color>
+    <color name="very_light_gray">#E5E7EB</color>
+    <color name="very_light_gray2">#E5E7EB</color>
+    <color name="very_very_light_gray">#F9FAFB</color>
+    <color name="white">#FFFFFF</color>
+    <color name="accent_white">#FFFFFF</color>
+
+    <!-- Legacy semantic -->
+    <color name="secondary">#0EA5E9</color>
+    <color name="secondaryTransparent">#330EA5E9</color>
+    <color name="background_discover">#5a4F46E5</color>
+    <color name="background_advertize">#5a4F46E5</color>
+    <color name="pressed_color">#E5E7EB</color>
+    <color name="red">#DC2626</color>
+    <color name="yellow">#D97706</color>
+    <color name="green">#16A34A</color>
+</resources>

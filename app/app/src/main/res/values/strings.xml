@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">VoxSwap</string>
+
+    <!-- Common -->
+    <string name="mic">mic</string>
+    <string name="exit">exit</string>
+    <string name="retry">Retry</string>
+    <string name="continue_without_tts">continue</string>
+    <string name="loading">loading…</string>
+    <string name="fix">fix</string>
+    <string name="notification_channel_name">use in background notification</string>
+
+    <!-- Download screen -->
+    <string name="title_download_models">Download Models</string>
+    <string name="description_download_models">Models are required for offline translation. Download them once over WiFi.</string>
+    <string name="button_download_all">Download All</string>
+    <string name="button_continue">Continue</string>
+    <string name="status_downloaded">Downloaded</string>
+    <string name="status_downloading">Downloading…</string>
+    <string name="status_not_downloaded">Not downloaded</string>
+    <string name="status_error">Error</string>
+    <string name="status_transferring">Transferring…</string>
+    <string name="status_verifying">Verifying…</string>
+
+    <!-- Home screen -->
+    <string name="status_ready">Ready</string>
+    <string name="status_connected">Connected to Box</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_listening">Listening</string>
+    <string name="status_translating">Translating…</string>
+    <string name="tap_to_start">Tap to start translating</string>
+    <string name="tap_to_stop">Tap to stop</string>
+    <string name="captions_placeholder">Captions will appear here</string>
+    <string name="change_languages">Change Languages</string>
+
+    <!-- Language select screen -->
+    <string name="title_languages">Languages</string>
+    <string name="button_done">Done</string>
+    <string name="section_your_language">Your Language</string>
+    <string name="section_target_language_1">Target Language 1</string>
+    <string name="section_target_language_2">Target Language 2 (Optional)</string>
+    <string name="hint_search_languages">Search languages…</string>
+
+    <!-- Settings screen -->
+    <string name="settings_title">Settings</string>
+    <string name="section_connection">Connection</string>
+    <string name="section_audio">Audio</string>
+    <string name="audio_input_device">Input Device</string>
+    <string name="audio_output_device">Output Device</string>
+    <string name="audio_system_default">System Default</string>
+    <string name="audio_type_builtin_mic">Built-in Mic</string>
+    <string name="audio_type_builtin_speaker">Built-in Speaker</string>
+    <string name="audio_type_earpiece">Earpiece</string>
+    <string name="audio_type_bluetooth">Bluetooth</string>
+    <string name="audio_type_bluetooth_a2dp">Bluetooth A2DP</string>
+    <string name="audio_type_bluetooth_le">Bluetooth LE</string>
+    <string name="audio_type_bluetooth_le_speaker">Bluetooth LE Speaker</string>
+    <string name="audio_type_usb">USB Audio</string>
+    <string name="audio_type_usb_headset">USB Headset</string>
+    <string name="audio_type_wired_headset">Wired Headset</string>
+    <string name="audio_type_wired_headphones">Wired Headphones</string>
+    <string name="audio_type_aux_line">Aux Line</string>
+    <string name="audio_type_unknown">Audio Device</string>
+    <string name="voice_status_ready">Ready</string>
+    <string name="voice_status_size_mb">%d MB</string>
+    <string name="voice_status_unavailable">—</string>
+    <string name="voice_download_title">Downloading voice models</string>
+    <string name="voice_download_message">Natural-sounding speech requires these voice models. Translation still works without them.</string>
+    <string name="voice_download_skip">Skip</string>
+    <string name="voice_download_error">Download failed for %s</string>
+    <string name="section_models">Models</string>
+    <string name="section_about">About</string>
+    <string name="connection_ready">Ready</string>
+    <string name="connection_connected">Connected</string>
+    <string name="connection_target">Target: 10.0.0.1</string>
+    <string name="button_redownload">Re-download Models</string>
+    <string name="about_app_name">VoxSwap Translator</string>
+    <string name="about_version">v0.1.0</string>
+    <string name="button_back">Back</string>
+    <string name="model_status_downloaded">Downloaded</string>
+    <string name="model_status_missing">Missing</string>
+    <string name="title_activity_settings">Settings</string>
+
+    <!-- TTS preferences (kept for stub) -->
+    <string name="preference_title_tts">Text to speech</string>
+    <string name="preference_description_tts">System settings of tts, an eventual change of the preferred engine will be applied only after the restart of the app</string>
+
+    <!-- Toasts -->
+    <string name="toast_working_background">VoxSwap will work in background</string>
+    <string name="toast_download_completed">Download completed</string>
+    <string name="toast_download_error">There was an error with the download, open VoxSwap to try again</string>
+
+    <!-- Dialogs -->
+    <string name="dialog_confirm_delete">Confirm cancellation</string>
+    <string name="dialog_confirm_exit">Confirm exit</string>
+
+    <!-- Errors -->
+    <string name="error_missing_location_permissions">Microphone permission is required, go to settings to grant it or reinstall the app</string>
+    <string name="error_missing_mic_permissions">Without the microphone permission the voice recognition does not work, go to the settings to grant the permission or reinstall the app</string>
+    <string name="error_tts">There was an error with the tts initialization, do you want to continue without tts?</string>
+    <string name="error_missing_tts">No TTS engine found on this device. Install Google TTS for text-to-speech.</string>
+    <string name="error_internet_lack_loading">To start VoxSwap an internet connection is required, check your connection</string>
+    <string name="error_internet_lack_accessing">To perform the operation an internet connection is required, check your connection</string>
+    <string name="error_internet_lack_services">Unable to translate message, check internet connection</string>
+    <string name="error_internet_lack_loading_languages">To view the languages you need an internet connection, check your connection and try again</string>
+    <string name="error_models_loading">There was an error loading the model files for translation and speech recognition. Some files may be corrupted. Try restarting the app. If the problem persists, press fix to re-download corrupted files.</string>
+    <string name="error_download">Error in the download, please ensure you have internet connection and retry:</string>
+    <string name="error_transfer">Error transferring the downloaded file to internal memory. Ensure no external storage was removed and retry:</string>
+    <string name="error_ram">Your device has less than 6GB of RAM. The app needs at least 6GB to work. You can still try, but it may crash.</string>
+    <string name="error_storage">Low storage space, the download may fail</string>
+
+    <!-- Download descriptions -->
+    <string name="description_download">Downloading %1$s</string>
+    <string name="description_transfer">Transferring %1$s in internal memory</string>
+    <string name="description_integrity_check">Checking integrity of %1$s</string>
+
+    <!-- Service notification -->
+    <string name="walkietalkie_mode_running">Translation is running…</string>
+
+</resources>
