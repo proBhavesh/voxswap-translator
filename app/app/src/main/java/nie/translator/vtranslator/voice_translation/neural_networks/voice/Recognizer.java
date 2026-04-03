@@ -27,6 +27,8 @@ import org.xml.sax.SAXException;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.Deflater;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -255,6 +257,20 @@ public class Recognizer extends NeuralNetworkApi {
 
         correctedText = correctedText.trim();
 
+        /* Discard hallucinated output — repeated text compresses extremely well.
+         * Compression ratio > 2.4 indicates repetition (same threshold as OpenAI Whisper). */
+        if (correctedText.length() > 0) {
+            float ratio = compressionRatio(correctedText);
+            if (ratio > 2.4f) {
+                Log.w("Recognizer", "Discarding hallucinated output (compression_ratio="
+                        + String.format("%.1f", ratio) + "): " + correctedText);
+                return "";
+            }
+        }
+
+        /* Collapse repeated phrases — safety net for borderline compression ratios */
+        correctedText = deduplicateRepeats(correctedText);
+
         if(correctedText.length() >= 2) {
             char firstChar = correctedText.charAt(0);
             if (Character.isLowerCase(firstChar)) {
@@ -265,6 +281,89 @@ public class Recognizer extends NeuralNetworkApi {
             correctedText = correctedText.replace("...", "");
         }
         return correctedText;
+    }
+
+    private float compressionRatio(String text) {
+        byte[] input = text.getBytes(StandardCharsets.UTF_8);
+        Deflater deflater = new Deflater();
+        try {
+            deflater.setInput(input);
+            deflater.finish();
+            byte[] buffer = new byte[input.length * 2 + 64];
+            int compressedSize = deflater.deflate(buffer);
+            if (compressedSize == 0) return 0f;
+            return (float) input.length / compressedSize;
+        } finally {
+            deflater.end();
+        }
+    }
+
+    /**
+     * Collapse consecutive repeated phrases (3+ occurrences) to a single occurrence.
+     * E.g. "Thank you. Thank you. Thank you." → "Thank you."
+     */
+    private String deduplicateRepeats(String text) {
+        if (text == null || text.isEmpty()) return text;
+
+        String[] words = text.split("\\s+");
+        if (words.length < 3) return text;
+
+        for (int phraseLen = 1; phraseLen <= Math.min(10, words.length / 3); phraseLen++) {
+            int i = 0;
+            StringBuilder result = new StringBuilder();
+            boolean foundRepeat = false;
+
+            while (i < words.length) {
+                if (i + phraseLen > words.length) {
+                    for (int j = i; j < words.length; j++) {
+                        if (result.length() > 0) result.append(" ");
+                        result.append(words[j]);
+                    }
+                    break;
+                }
+
+                StringBuilder phrase = new StringBuilder();
+                for (int j = i; j < i + phraseLen; j++) {
+                    if (phrase.length() > 0) phrase.append(" ");
+                    phrase.append(words[j]);
+                }
+                String phraseStr = phrase.toString();
+
+                int repeatCount = 1;
+                int nextStart = i + phraseLen;
+                while (nextStart + phraseLen <= words.length) {
+                    StringBuilder nextPhrase = new StringBuilder();
+                    for (int j = nextStart; j < nextStart + phraseLen; j++) {
+                        if (nextPhrase.length() > 0) nextPhrase.append(" ");
+                        nextPhrase.append(words[j]);
+                    }
+                    if (nextPhrase.toString().equalsIgnoreCase(phraseStr)) {
+                        repeatCount++;
+                        nextStart += phraseLen;
+                    } else {
+                        break;
+                    }
+                }
+
+                if (repeatCount >= 3) {
+                    if (result.length() > 0) result.append(" ");
+                    result.append(phraseStr);
+                    i = nextStart;
+                    foundRepeat = true;
+                } else {
+                    if (result.length() > 0) result.append(" ");
+                    result.append(words[i]);
+                    i++;
+                }
+            }
+
+            if (foundRepeat) {
+                Log.i("Recognizer", "Dedup collapsed repeated phrase: " + text + " → " + result);
+                return result.toString();
+            }
+        }
+
+        return text;
     }
 
     /* Whisper supports all 99 languages — filter by quality threshold */
