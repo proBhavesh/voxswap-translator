@@ -26,6 +26,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 import android.media.AudioDeviceCallback;
@@ -157,6 +159,11 @@ public abstract class VoiceTranslationService extends GeneralService {
     private final AtomicLong utteranceCounter = new AtomicLong(0);
     private final ConcurrentHashMap<String, CustomLocale> utteranceLanguageMap = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> utteranceTtsStartTime = new ConcurrentHashMap<>();
+    private final ExecutorService ttsExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "tts-worker");
+        t.setPriority(Thread.MAX_PRIORITY);
+        return t;
+    });
     private final Object playbackLock = new Object();
     @Nullable
     private AudioTrack currentAudioTrack;
@@ -443,7 +450,11 @@ public abstract class VoiceTranslationService extends GeneralService {
 
     // tts
 
-    public synchronized void speak(String result, CustomLocale language) {
+    public void speak(String result, CustomLocale language) {
+        ttsExecutor.execute(() -> speakInternal(result, language));
+    }
+
+    private void speakInternal(String result, CustomLocale language) {
         synchronized (mLock) {
             if (isAudioMute) return;
 
@@ -805,6 +816,7 @@ public abstract class VoiceTranslationService extends GeneralService {
     @Override
     public synchronized void onDestroy() {
         super.onDestroy();
+        ttsExecutor.shutdownNow();
         // Stop listening to voice
         stopVoiceRecorder();
         if(mVoiceRecorder != null) {

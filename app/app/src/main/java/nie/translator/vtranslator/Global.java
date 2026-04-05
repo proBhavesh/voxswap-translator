@@ -61,6 +61,7 @@ public class Global extends Application implements DefaultLifecycleObserver {
     private String preferredOutputDeviceName = null;
     private int preferredOutputDeviceType = -1;
     private int beamSize = -1;
+    private int captionSaveEnabled = -1;
     private int amplitudeThreshold = Recorder.DEFAULT_AMPLITUDE_THRESHOLD;
     private boolean isForeground = false;
     @Nullable
@@ -733,6 +734,22 @@ public class Global extends Application implements DefaultLifecycleObserver {
         final SharedPreferences sharedPreferences = this.getSharedPreferences("default", Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putInt("beamSize", value);
+        editor.apply();
+    }
+
+    public boolean isCaptionSaveEnabled() {
+        if (captionSaveEnabled == -1) {
+            final SharedPreferences sharedPreferences = this.getSharedPreferences("default", Context.MODE_PRIVATE);
+            captionSaveEnabled = sharedPreferences.getBoolean("captionSaveEnabled", false) ? 1 : 0;
+        }
+        return captionSaveEnabled == 1;
+    }
+
+    public void setCaptionSaveEnabled(boolean enabled) {
+        captionSaveEnabled = enabled ? 1 : 0;
+        final SharedPreferences sharedPreferences = this.getSharedPreferences("default", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putBoolean("captionSaveEnabled", enabled);
         editor.apply();
     }
 

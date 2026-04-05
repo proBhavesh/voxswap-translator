@@ -20,6 +20,7 @@ import java.util.Objects;
 
 import nie.translator.vtranslator.Global;
 import nie.translator.vtranslator.tools.AudioUtils;
+import nie.translator.vtranslator.tools.CaptionFileWriter;
 import nie.translator.vtranslator.tools.CustomLocale;
 import nie.translator.vtranslator.tools.Tools;
 import nie.translator.vtranslator.tools.gui.messages.GuiMessage;
@@ -76,6 +77,9 @@ public class WalkieTalkieService extends VoiceTranslationService {
     private volatile AudioTrack passthroughAudioTrack;
     private final Object passthroughLock = new Object(); /* guards init/release only, not hot-path writes */
 
+    /* Caption file saving */
+    private CaptionFileWriter captionFileWriter;
+
     /* Networking — box connection + audio streaming */
     private BoxConnection boxConnection;
     private AudioStreamer audioStreamer;
@@ -88,13 +92,14 @@ public class WalkieTalkieService extends VoiceTranslationService {
         super.onCreate();
         translator = ((Global) getApplication()).getTranslator();
         speechRecognizer = ((Global) getApplication()).getSpeechRecognizer();
+        captionFileWriter = new CaptionFileWriter();
 
         clientHandler = new Handler(new Handler.Callback() {
             @Override
             public boolean handleMessage(@NonNull android.os.Message message) {
                 int command = message.getData().getInt("command", -1);
                 if (command != -1) {
-                    if (!WalkieTalkieService.super.executeCommand(command, message.getData())) {
+                    if (!WalkieTalkieService.this.executeCommand(command, message.getData())) {
                         switch (command) {
                             case GET_FIRST_LANGUAGE: {
                                 Bundle bundle = new Bundle();
@@ -244,6 +249,7 @@ public class WalkieTalkieService extends VoiceTranslationService {
                 GuiMessage message = new GuiMessage(new Message(textToTranslate, WalkieTalkieService.this, text), resultID, true, isFinal);
                 WalkieTalkieService.super.notifyMessage(message);
                 WalkieTalkieService.super.addOrUpdateMessage(message);
+                writeCaptionIfOpen(isFinal, resultID, textToTranslate, text, targetLanguage1);
             }
 
             @Override
@@ -264,6 +270,7 @@ public class WalkieTalkieService extends VoiceTranslationService {
                 GuiMessage message = new GuiMessage(new Message(textToTranslate, WalkieTalkieService.this, text), resultID, false, isFinal);
                 WalkieTalkieService.super.notifyMessage(message);
                 WalkieTalkieService.super.addOrUpdateMessage(message);
+                writeCaptionIfOpen(isFinal, resultID, textToTranslate, text, targetLanguage2);
             }
 
             @Override
@@ -438,8 +445,38 @@ public class WalkieTalkieService extends VoiceTranslationService {
         audioStreamer.streamTtsAudio(pcmData.pcmBytes, pcmData.sampleRate, streamType);
     }
 
+    private void writeCaptionIfOpen(boolean isFinal, long resultID, String originalText, String translatedText, CustomLocale targetLanguage) {
+        if (isFinal && captionFileWriter.isOpen()) {
+            captionFileWriter.appendEntry(resultID, originalText, translatedText,
+                    targetLanguage != null ? targetLanguage.getCode() : "?");
+        }
+    }
+
+    @Override
+    protected boolean executeCommand(int command, Bundle data) {
+        switch (command) {
+            case START_MIC:
+                if (((Global) getApplication()).isCaptionSaveEnabled()) {
+                    String srcName = sourceLanguage != null ? sourceLanguage.getDisplayNameWithoutTTS() : "?";
+                    String t1Name = targetLanguage1 != null ? targetLanguage1.getDisplayNameWithoutTTS() : "";
+                    String t2Name = targetLanguage2 != null ? targetLanguage2.getDisplayNameWithoutTTS() : "";
+                    captionFileWriter.open(this, srcName, t1Name, t2Name);
+                }
+                break;
+            case STOP_MIC:
+                if (data.getBoolean("permanent")) {
+                    /* Defer close so in-flight translation callbacks (posted to main handler)
+                     * can still write their entries before the file is closed */
+                    new Handler(getMainLooper()).post(() -> captionFileWriter.close());
+                }
+                break;
+        }
+        return super.executeCommand(command, data);
+    }
+
     @Override
     public void onDestroy() {
+        captionFileWriter.close();
         releasePassthroughAudioTrack();
         if (boxConnection != null) boxConnection.disconnect();
         if (audioStreamer != null) audioStreamer.stop();

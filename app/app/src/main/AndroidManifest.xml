@@ -17,6 +17,8 @@
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
 
     <application
         android:name="nie.translator.vtranslator.Global"
@@ -67,6 +69,16 @@
 
         <service android:name="nie.translator.vtranslator.voice_translation._walkie_talkie_mode._walkie_talkie.WalkieTalkieService"
             android:foregroundServiceType="microphone"/>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <receiver android:name=".access.DownloadReceiver" android:exported="true">
             <intent-filter>

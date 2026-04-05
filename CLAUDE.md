@@ -51,7 +51,8 @@ Two codebases in this monorepo:
 - Translation pipeline: Mic → VAD → Whisper STT → NLLB Translate → Android TTS → Send to box
 - Pipeline is sequential per chunk: STT → translate target1 → translate target2 → TTS
 - Audio sent as raw PCM over UDP (port 7701), control over TCP (port 7700)
-- Models (~850MB total) downloaded on first launch, not bundled with app
+- Models (~850MB total) downloaded on first launch from HuggingFace, not bundled with app
+- **Model hosting: HuggingFace only** — all models hosted at `https://huggingface.co/bhavsh/voxswap-models`. Never use GitHub releases for model hosting (too slow). Upload new models via `hf upload` CLI.
 - Everything runs offline during operation
 - Debug/profiling flags in `DebugConfig.java`
 
@@ -134,3 +135,10 @@ Two codebases in this monorepo:
 - Translation pipeline: Whisper Small (STT) → NLLB-200 Distilled 600M (translate) → Android TTS
 - Phone does all heavy processing (VAD + STT + translate + TTS)
 - Box is lightweight (receive + mix + output/broadcast)
+
+
+## Subagents
+Do not spawn subagents (Agent tool) unless explicitly asked by the user or invoked by a skill/plugin.
+For code exploration, file searches, and codebase questions, use Glob, Grep, and Read directly —
+these are faster and maintain conversation context. Subagents lack conversation context and
+often provide less accurate results than working directly.

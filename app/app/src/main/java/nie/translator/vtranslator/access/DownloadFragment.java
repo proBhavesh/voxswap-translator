@@ -28,8 +28,9 @@ import nie.translator.vtranslator.tools.FileTools;
 import nie.translator.vtranslator.voice_translation.neural_networks.NeuralNetworkApi;
 
 public class DownloadFragment extends Fragment {
-    private static final String MODELS_BASE = "https://github.com/proBhavesh/voxswap-translator/releases/download/models-v1/";
-    public static final String PIPER_BASE = "https://github.com/proBhavesh/voxswap-translator/releases/download/piper-tts-voices/";
+    private static final String HF_BASE = "https://huggingface.co/bhavsh/voxswap-models/resolve/main/";
+    private static final String MODELS_BASE = HF_BASE;
+    public static final String PIPER_BASE = HF_BASE;
 
     /* Core models downloaded on first launch — NLLB + Whisper + English Piper voice */
     public static final String[] DOWNLOAD_URLS = {

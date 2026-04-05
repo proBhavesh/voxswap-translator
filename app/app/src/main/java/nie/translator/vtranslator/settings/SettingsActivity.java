@@ -1,6 +1,10 @@
 package nie.translator.vtranslator.settings;
 
+import android.Manifest;
 import android.content.Intent;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
 import android.graphics.drawable.GradientDrawable;
 import android.media.AudioDeviceCallback;
 import android.media.AudioDeviceInfo;
@@ -8,17 +12,29 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
+import android.view.ViewGroup;
+import android.widget.ImageView;
+import android.widget.Toast;
 import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.recyclerview.widget.RecyclerView;
+
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 
 import com.google.android.material.button.MaterialButton;
 
+import android.text.format.Formatter;
+
 import java.io.File;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import nie.translator.vtranslator.GeneralActivity;
 import nie.translator.vtranslator.Global;
@@ -26,16 +42,24 @@ import nie.translator.vtranslator.R;
 import nie.translator.vtranslator.access.AccessActivity;
 import nie.translator.vtranslator.access.DownloadFragment;
 import nie.translator.vtranslator.tools.AudioDeviceManager;
+import nie.translator.vtranslator.tools.CaptionFileWriter;
 import nie.translator.vtranslator.tools.CustomServiceConnection;
 import android.widget.Spinner;
+import nie.translator.vtranslator.tools.Tools;
 import nie.translator.vtranslator.tools.gui.messages.GuiMessage;
 import nie.translator.vtranslator.tools.services_communication.ServiceCommunicator;
 import nie.translator.vtranslator.tools.services_communication.ServiceCommunicatorListener;
 import nie.translator.vtranslator.voice_translation.VoiceTranslationService;
 import nie.translator.vtranslator.voice_translation._walkie_talkie_mode._walkie_talkie.WalkieTalkieService;
 
+import androidx.annotation.NonNull;
+import androidx.core.app.ActivityCompat;
+
+import com.google.android.material.switchmaterial.SwitchMaterial;
+
 public class SettingsActivity extends GeneralActivity {
     private static final int COMMUNICATOR_ID = 1000;
+    private static final int REQUEST_STORAGE_PERMISSION = 200;
 
     private View connectionDot;
     private TextView connectionLabel;
@@ -54,6 +78,7 @@ public class SettingsActivity extends GeneralActivity {
     private AudioDeviceCallback deviceCallback;
     private boolean isRestoringSelection = false;
     private WalkieTalkieService.WalkieTalkieServiceCommunicator serviceCommunicator;
+    private SwitchMaterial captionSaveSwitch;
     private final Runnable refreshRunnable = this::refreshDeviceLists;
     private static final long REFRESH_DEBOUNCE_MS = 200;
 
@@ -67,9 +92,6 @@ public class SettingsActivity extends GeneralActivity {
 
         global = (Global) getApplication();
 
-        connectionDot = findViewById(R.id.connectionDot);
-        connectionLabel = findViewById(R.id.connectionLabel);
-
         MaterialButton backButton = findViewById(R.id.backButton);
         backButton.setOnClickListener(v -> finish());
 
@@ -81,6 +103,8 @@ public class SettingsActivity extends GeneralActivity {
 
         populateModelList();
         setupAudioDeviceSelection();
+        setupCaptionSaveToggle();
+        setupModelsCollapse();
     }
 
     @Override
@@ -91,6 +115,7 @@ public class SettingsActivity extends GeneralActivity {
             refreshDeviceLists();
         }
         bindToService();
+        populateTranscriptionList();
     }
 
     @Override
@@ -211,6 +236,130 @@ public class SettingsActivity extends GeneralActivity {
         }
     }
 
+    private void setupCaptionSaveToggle() {
+        captionSaveSwitch = findViewById(R.id.captionSaveSwitch);
+        captionSaveSwitch.setChecked(global.isCaptionSaveEnabled());
+        captionSaveSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            if (isChecked) {
+                /* API 29+: scoped storage, no permission needed for Documents/ */
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+                        || Tools.hasPermissions(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+                    global.setCaptionSaveEnabled(true);
+                } else {
+                    ActivityCompat.requestPermissions(this,
+                            new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                            REQUEST_STORAGE_PERMISSION);
+                }
+            } else {
+                global.setCaptionSaveEnabled(false);
+            }
+        });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_STORAGE_PERMISSION) {
+            if (grantResults.length > 0 && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                global.setCaptionSaveEnabled(true);
+            } else {
+                captionSaveSwitch.setChecked(false);
+                Toast.makeText(this, R.string.caption_permission_denied, Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void setupModelsCollapse() {
+        View modelsHeader = findViewById(R.id.modelsHeader);
+        View modelsContent = findViewById(R.id.modelsContent);
+        ImageView modelsChevron = findViewById(R.id.modelsChevron);
+
+        modelsHeader.setOnClickListener(v -> {
+            boolean expanding = modelsContent.getVisibility() == View.GONE;
+            modelsContent.setVisibility(expanding ? View.VISIBLE : View.GONE);
+            modelsChevron.setRotation(expanding ? 90f : 0f);
+        });
+    }
+
+    private void populateTranscriptionList() {
+        RecyclerView recycler = findViewById(R.id.transcriptionListRecycler);
+        TextView emptyView = findViewById(R.id.transcriptionEmpty);
+
+        File voxswapDir = new File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
+                CaptionFileWriter.DIR_NAME
+        );
+
+        File[] files = voxswapDir.listFiles((dir, name) -> name.endsWith(".txt"));
+
+        if (files == null || files.length == 0) {
+            emptyView.setVisibility(View.VISIBLE);
+            recycler.setVisibility(View.GONE);
+            return;
+        }
+
+        emptyView.setVisibility(View.GONE);
+        Arrays.sort(files, (a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+
+        recycler.setLayoutManager(new androidx.recyclerview.widget.LinearLayoutManager(this));
+        recycler.setAdapter(new TranscriptionAdapter(files));
+    }
+
+    private class TranscriptionAdapter extends RecyclerView.Adapter<TranscriptionAdapter.VH> {
+        private final File[] files;
+        private final SimpleDateFormat displayFormat = new SimpleDateFormat("MMM d, yyyy — h:mm a", Locale.getDefault());
+
+        TranscriptionAdapter(File[] files) {
+            this.files = files;
+        }
+
+        @NonNull
+        @Override
+        public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            View row = getLayoutInflater().inflate(R.layout.item_transcription_row, parent, false);
+            return new VH(row);
+        }
+
+        @Override
+        public void onBindViewHolder(@NonNull VH holder, int position) {
+            File file = files[position];
+            holder.dateView.setText(displayFormat.format(new Date(file.lastModified())));
+            holder.sizeView.setText(formatFileSize(file.length()));
+            holder.itemView.setOnClickListener(v -> openTranscriptionFile(file));
+        }
+
+        @Override
+        public int getItemCount() {
+            return files.length;
+        }
+
+        class VH extends RecyclerView.ViewHolder {
+            TextView dateView, sizeView;
+            VH(View v) {
+                super(v);
+                dateView = v.findViewById(R.id.transcriptionDate);
+                sizeView = v.findViewById(R.id.transcriptionSize);
+            }
+        }
+    }
+
+    private String formatFileSize(long bytes) {
+        return Formatter.formatShortFileSize(this, bytes);
+    }
+
+    private void openTranscriptionFile(File file) {
+        try {
+            Uri uri = FileProvider.getUriForFile(this,
+                    getPackageName() + ".fileprovider", file);
+            Intent intent = new Intent(Intent.ACTION_VIEW);
+            intent.setDataAndType(uri, "text/plain");
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            startActivity(intent);
+        } catch (Exception e) {
+            Toast.makeText(this, R.string.transcription_open_error, Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void populateModelList() {
         LinearLayout container = findViewById(R.id.modelListContainer);
         LayoutInflater inflater = getLayoutInflater();
@@ -306,6 +455,7 @@ public class SettingsActivity extends GeneralActivity {
     }
 
     private void updateConnectionUI(boolean connected) {
+        if (connectionLabel == null) return;
         if (connected) {
             connectionLabel.setText(R.string.connection_connected);
             setConnectionDotColor(ContextCompat.getColor(this, R.color.brand_primary));
@@ -316,6 +466,7 @@ public class SettingsActivity extends GeneralActivity {
     }
 
     private void setConnectionDotColor(int color) {
+        if (connectionDot == null) return;
         GradientDrawable bg = (GradientDrawable) connectionDot.getBackground();
         bg.setColor(color);
     }

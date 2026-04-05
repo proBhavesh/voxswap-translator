@@ -34,6 +34,18 @@
     <string name="captions_placeholder">Captions will appear here</string>
     <string name="change_languages">Change Languages</string>
 
+    <!-- Caption saving -->
+    <string name="section_captions">Captions</string>
+    <string name="caption_save_title">Save Captions</string>
+    <string name="caption_save_description">Save translation text to Documents/VoxSwap</string>
+    <string name="caption_saving">Saving captions</string>
+    <string name="caption_saved">Captions saved</string>
+    <string name="caption_reset">RESET</string>
+    <string name="caption_permission_denied">Storage permission is required to save captions</string>
+    <string name="section_transcriptions">Transcriptions</string>
+    <string name="transcription_empty">No transcription files yet</string>
+    <string name="transcription_open_error">No app to open text files</string>
+
     <!-- Language select screen -->
     <string name="title_languages">Languages</string>
     <string name="button_done">Done</string>

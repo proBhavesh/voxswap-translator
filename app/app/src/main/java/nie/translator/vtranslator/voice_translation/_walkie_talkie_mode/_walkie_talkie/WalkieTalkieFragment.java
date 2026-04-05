@@ -57,6 +57,9 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
     private TextView captionText;
     private MaterialButton changeLanguagesButton;
     private TextView retryButton;
+    private View captionActionsRow;
+    private TextView captionSaveStatus;
+    private TextView resetCaptionsButton;
 
     /* Service connection */
     protected WalkieTalkieService.WalkieTalkieServiceCommunicator walkieTalkieServiceCommunicator;
@@ -95,6 +98,9 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
         captionText = view.findViewById(R.id.captionText);
         changeLanguagesButton = view.findViewById(R.id.changeLanguagesButton);
         retryButton = view.findViewById(R.id.retryButton);
+        captionActionsRow = view.findViewById(R.id.captionActionsRow);
+        captionSaveStatus = view.findViewById(R.id.captionSaveStatus);
+        resetCaptionsButton = view.findViewById(R.id.resetCaptionsButton);
     }
 
     @Override
@@ -131,6 +137,11 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
                 statusLabel.setText(R.string.loading);
                 retryButton.setVisibility(View.GONE);
             }
+        });
+
+        resetCaptionsButton.setOnClickListener(v -> {
+            captionText.setText(R.string.captions_placeholder);
+            captionText.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_muted));
         });
     }
 
@@ -257,12 +268,29 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
             statusText.setText(R.string.tap_to_stop);
             setStatusDotColor(ContextCompat.getColor(requireContext(), R.color.status_success));
             statusLabel.setText(R.string.status_listening);
+
+            boolean captionSaveOn = ((Global) requireActivity().getApplication()).isCaptionSaveEnabled();
+            if (captionActionsRow != null) {
+                captionActionsRow.setVisibility(captionSaveOn ? View.VISIBLE : View.GONE);
+                if (captionSaveOn) {
+                    captionSaveStatus.setText(R.string.caption_saving);
+                }
+            }
         } else {
             micButton.setBackgroundResource(R.drawable.circle_brand);
             micButton.setImageResource(R.drawable.mic_icon);
             micGlow.setBackgroundResource(R.drawable.circle_glow);
             statusText.setText(R.string.tap_to_start);
             updateConnectionUI(isBoxConnected);
+
+            if (captionActionsRow != null && captionActionsRow.getVisibility() == View.VISIBLE) {
+                captionSaveStatus.setText(R.string.caption_saved);
+                mHandler.postDelayed(() -> {
+                    if (captionActionsRow != null) {
+                        captionActionsRow.setVisibility(View.GONE);
+                    }
+                }, 3000);
+            }
         }
     }
 
