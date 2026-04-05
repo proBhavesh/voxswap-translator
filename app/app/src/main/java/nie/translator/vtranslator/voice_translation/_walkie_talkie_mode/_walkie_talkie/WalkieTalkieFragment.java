@@ -59,7 +59,6 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
     private TextView retryButton;
     private View captionActionsRow;
     private TextView captionSaveStatus;
-    private TextView resetCaptionsButton;
 
     /* Service connection */
     protected WalkieTalkieService.WalkieTalkieServiceCommunicator walkieTalkieServiceCommunicator;
@@ -100,7 +99,6 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
         retryButton = view.findViewById(R.id.retryButton);
         captionActionsRow = view.findViewById(R.id.captionActionsRow);
         captionSaveStatus = view.findViewById(R.id.captionSaveStatus);
-        resetCaptionsButton = view.findViewById(R.id.resetCaptionsButton);
     }
 
     @Override
@@ -139,10 +137,6 @@ public class WalkieTalkieFragment extends VoiceTranslationFragment implements Mi
             }
         });
 
-        resetCaptionsButton.setOnClickListener(v -> {
-            captionText.setText(R.string.captions_placeholder);
-            captionText.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_muted));
-        });
     }
 
     @Override

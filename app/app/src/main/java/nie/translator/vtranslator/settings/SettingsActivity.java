@@ -1,6 +1,7 @@
 package nie.translator.vtranslator.settings;
 
 import android.Manifest;
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
@@ -105,6 +106,7 @@ public class SettingsActivity extends GeneralActivity {
         setupAudioDeviceSelection();
         setupCaptionSaveToggle();
         setupModelsCollapse();
+        setupClearTranscriptions();
     }
 
     @Override
@@ -278,6 +280,30 @@ public class SettingsActivity extends GeneralActivity {
             boolean expanding = modelsContent.getVisibility() == View.GONE;
             modelsContent.setVisibility(expanding ? View.VISIBLE : View.GONE);
             modelsChevron.setRotation(expanding ? 90f : 0f);
+        });
+    }
+
+    private void setupClearTranscriptions() {
+        MaterialButton clearButton = findViewById(R.id.clearTranscriptionsButton);
+        clearButton.setOnClickListener(v -> {
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.caption_clear_confirm_title)
+                    .setMessage(R.string.caption_clear_confirm_message)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.caption_clear_confirm_delete, (dialog, which) -> {
+                        File voxswapDir = new File(
+                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS),
+                                CaptionFileWriter.DIR_NAME
+                        );
+                        File[] files = voxswapDir.listFiles((dir, name) -> name.endsWith(".txt"));
+                        if (files != null) {
+                            for (File file : files) {
+                                file.delete();
+                            }
+                        }
+                        populateTranscriptionList();
+                    })
+                    .show();
         });
     }
 

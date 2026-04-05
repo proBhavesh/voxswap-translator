@@ -234,6 +234,20 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/clearTranscriptionsButton"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_gravity="start"
+                android:layout_marginStart="16dp"
+                android:layout_marginTop="8dp"
+                android:text="@string/caption_clear_all"
+                android:textColor="@color/brand_primary"
+                app:cornerRadius="8dp"
+                app:strokeColor="@color/brand_primary"
+                app:strokeWidth="1dp" />
+
             <!-- Models section (collapsible) -->
             <LinearLayout
                 android:id="@+id/modelsHeader"

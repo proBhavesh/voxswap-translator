@@ -40,8 +40,11 @@
     <string name="caption_save_description">Save translation text to Documents/VoxSwap</string>
     <string name="caption_saving">Saving captions</string>
     <string name="caption_saved">Captions saved</string>
-    <string name="caption_reset">RESET</string>
     <string name="caption_permission_denied">Storage permission is required to save captions</string>
+    <string name="caption_clear_all">Clear All</string>
+    <string name="caption_clear_confirm_title">Delete transcriptions?</string>
+    <string name="caption_clear_confirm_message">This will delete all saved transcription files. This cannot be undone.</string>
+    <string name="caption_clear_confirm_delete">Delete</string>
     <string name="section_transcriptions">Transcriptions</string>
     <string name="transcription_empty">No transcription files yet</string>
     <string name="transcription_open_error">No app to open text files</string>
