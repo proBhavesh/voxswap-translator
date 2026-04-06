@@ -18,6 +18,7 @@ import java.util.Map;
 
 import nie.translator.vtranslator.R;
 import nie.translator.vtranslator.tools.CustomLocale;
+import nie.translator.vtranslator.tools.PiperVoiceCatalog;
 import nie.translator.vtranslator.tools.VoiceDownloadManager;
 
 public class LanguagePickerAdapter extends RecyclerView.Adapter<LanguagePickerAdapter.ViewHolder> {
@@ -66,9 +67,9 @@ public class LanguagePickerAdapter extends RecyclerView.Adapter<LanguagePickerAd
         voiceStatusMap = new HashMap<>();
         for (CustomLocale locale : allLanguages) {
             String langCode = locale.getLanguage();
-            if (VoiceDownloadManager.isVoiceDownloaded(context, langCode)) {
+            if (PiperVoiceCatalog.hasAnyDownloaded(context, langCode)) {
                 voiceStatusMap.put(langCode, VoiceStatus.READY);
-            } else if (VoiceDownloadManager.isVoiceAvailable(langCode)) {
+            } else if (PiperVoiceCatalog.isAvailable(langCode)) {
                 voiceStatusMap.put(langCode, VoiceStatus.AVAILABLE);
             } else {
                 voiceStatusMap.put(langCode, VoiceStatus.NOT_AVAILABLE);

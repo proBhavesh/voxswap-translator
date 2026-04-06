@@ -369,12 +369,11 @@ public class WalkieTalkieService extends VoiceTranslationService {
                 + " target2=" + (targetLanguage2 != null ? targetLanguage2.getCode() : "null")
                 + " isFirstStart=" + isFirstStart);
 
-        /* Only invalidate cache and reload engines when target languages actually changed */
+        /* Reload engines when target languages actually changed */
         boolean languagesChanged = isFirstStart
                 || !Objects.equals(prevTarget1, targetLanguage1)
                 || !Objects.equals(prevTarget2, targetLanguage2);
         if (languagesChanged) {
-            invalidateVoiceCache();
             preloadPiperEngines(targetLanguage1, targetLanguage2);
         }
 

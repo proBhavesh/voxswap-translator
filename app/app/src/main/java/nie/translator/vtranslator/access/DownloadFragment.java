@@ -32,7 +32,7 @@ public class DownloadFragment extends Fragment {
     private static final String MODELS_BASE = HF_BASE;
     public static final String PIPER_BASE = HF_BASE;
 
-    /* Core models downloaded on first launch — NLLB + Whisper + English Piper voice */
+    /* Core models downloaded on first launch — NLLB + Whisper + English Piper voices */
     public static final String[] DOWNLOAD_URLS = {
             MODELS_BASE + "NLLB_cache_initializer.onnx",
             MODELS_BASE + "NLLB_decoder.onnx",
@@ -42,6 +42,7 @@ public class DownloadFragment extends Fragment {
             MODELS_BASE + "base-decoder.int8.onnx",
             MODELS_BASE + "base-tokens.txt",
             PIPER_BASE + "en_US-lessac-medium.onnx",
+            PIPER_BASE + "en_US-ryan-medium.onnx",
     };
     public static final String[] DOWNLOAD_NAMES = {
             "NLLB_cache_initializer.onnx",
@@ -52,6 +53,7 @@ public class DownloadFragment extends Fragment {
             "base-decoder.int8.onnx",
             "base-tokens.txt",
             "en_US-lessac-medium.onnx",
+            "en_US-ryan-medium.onnx",
     };
     public static final int[] DOWNLOAD_SIZES = {
             24000,   /* NLLB_cache_initializer */
@@ -61,7 +63,8 @@ public class DownloadFragment extends Fragment {
             28000,   /* base-encoder.int8 */
             125000,  /* base-decoder.int8 */
             798,     /* base-tokens.txt */
-            63000,   /* en_US-lessac-medium (English Piper voice) */
+            63000,   /* en_US-lessac-medium (female) */
+            63000,   /* en_US-ryan-medium (male) */
     };
     private static final long INTERVAL_TIME_FOR_GUI_UPDATES_MS = 500;
     private AccessActivity activity;

@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import nie.translator.vtranslator.tools.CustomLocale;
+import nie.translator.vtranslator.tools.PiperVoiceCatalog;
 import nie.translator.vtranslator.tools.VoiceDownloadManager;
 import nie.translator.vtranslator.tools.gui.LanguagePickerAdapter;
 
@@ -153,13 +154,13 @@ public class LanguageSelectActivity extends AppCompatActivity {
         List<String> toDownload = new ArrayList<>();
         if (target1Adapter != null && target1Adapter.getSelectedLanguage() != null) {
             String lang = target1Adapter.getSelectedLanguage().getLanguage();
-            if (VoiceDownloadManager.isVoiceAvailable(lang) && !VoiceDownloadManager.isVoiceDownloaded(this, lang)) {
+            if (PiperVoiceCatalog.isAvailable(lang) && !PiperVoiceCatalog.hasAnyDownloaded(this, lang)) {
                 toDownload.add(lang);
             }
         }
         if (target2Adapter != null && target2Adapter.getSelectedLanguage() != null) {
             String lang = target2Adapter.getSelectedLanguage().getLanguage();
-            if (VoiceDownloadManager.isVoiceAvailable(lang) && !VoiceDownloadManager.isVoiceDownloaded(this, lang)) {
+            if (PiperVoiceCatalog.isAvailable(lang) && !PiperVoiceCatalog.hasAnyDownloaded(this, lang)) {
                 toDownload.add(lang);
             }
         }

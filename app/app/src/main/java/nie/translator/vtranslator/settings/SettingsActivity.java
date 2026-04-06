@@ -26,6 +26,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 
 import android.text.format.Formatter;
 
@@ -104,9 +105,22 @@ public class SettingsActivity extends GeneralActivity {
 
         populateModelList();
         setupAudioDeviceSelection();
+        setupGenderToggle();
         setupCaptionSaveToggle();
         setupModelsCollapse();
         setupClearTranscriptions();
+    }
+
+    private void setupGenderToggle() {
+        MaterialButtonToggleGroup group = findViewById(R.id.genderToggleGroup);
+        Global.Gender current = global.getSpeakerGender();
+        group.check(current == Global.Gender.FEMALE ? R.id.genderFemaleButton : R.id.genderMaleButton);
+        group.addOnButtonCheckedListener((g, checkedId, isChecked) -> {
+            if (!isChecked) return;
+            global.setSpeakerGender(checkedId == R.id.genderFemaleButton
+                    ? Global.Gender.FEMALE
+                    : Global.Gender.MALE);
+        });
     }
 
     @Override

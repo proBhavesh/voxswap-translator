@@ -14,6 +14,7 @@ import android.util.Log;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -21,7 +22,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import nie.translator.vtranslator.access.DownloadFragment;
 import nie.translator.vtranslator.access.Downloader;
-import nie.translator.vtranslator.voice_translation.VoiceTranslationService;
 
 /**
  * Manages on-demand Piper TTS voice model downloads.
@@ -47,7 +47,7 @@ public class VoiceDownloadManager {
         VOICE_SIZES.put("hi", 63000);
         VOICE_SIZES.put("hu", 63000);
         VOICE_SIZES.put("id", 63000);
-        VOICE_SIZES.put("is", 63000);
+        VOICE_SIZES.put("is", 73000);
         VOICE_SIZES.put("it", 63000);
         VOICE_SIZES.put("ka", 63000);
         VOICE_SIZES.put("kk", 128000);
@@ -75,27 +75,45 @@ public class VoiceDownloadManager {
         void onAllComplete();
     }
 
-    /**
-     * Shared check: does a Piper voice model file exist in internal storage?
-     * Used by VoiceTranslationService.hasPiperVoice() and the language picker UI.
-     */
-    public static boolean isVoiceDownloaded(Context context, String langCode) {
-        String modelFile = VoiceTranslationService.PIPER_VOICE_MODELS.get(langCode);
-        return modelFile != null && new File(context.getFilesDir(), modelFile).exists();
+    private static final class FileState {
+        final String filename;
+        final String lang;
+        final long downloadId;
+        volatile int percent = 0;
+        volatile boolean dirty = false;
+
+        FileState(String filename, String lang, long downloadId) {
+            this.filename = filename;
+            this.lang = lang;
+            this.downloadId = downloadId;
+        }
     }
 
-    public static boolean isVoiceAvailable(String langCode) {
-        return VoiceTranslationService.PIPER_VOICE_MODELS.containsKey(langCode);
+    private static final class LangState {
+        final List<FileState> files = new ArrayList<>();
+        final AtomicInteger remainingFiles;
+        volatile int lastPostedPercent = -1;
+
+        LangState(int expectedFiles) {
+            this.remainingFiles = new AtomicInteger(expectedFiles);
+        }
     }
 
+    /** Combined size for variant languages (both genders), single size otherwise. */
     public static int getVoiceModelSizeKB(String langCode) {
         Integer size = VOICE_SIZES.get(langCode);
-        return size != null ? size : -1;
+        if (size == null) return -1;
+        if (PiperVoiceCatalog.isVariant(langCode)) {
+            return size * 2;
+        }
+        return size;
     }
 
     /**
-     * Download voice models for the given language codes in parallel.
-     * Returns a list of DownloadManager IDs that can be passed to cancelDownloads().
+     * Download all required voice files for the given languages in parallel.
+     * Variant languages download both male and female voices. Per-language progress
+     * is averaged across files; onComplete(lang) fires only when all files for that
+     * language are present.
      */
     public static List<Long> downloadVoices(Context context, List<String> langCodes, DownloadCallback callback) {
         Context appContext = context.getApplicationContext();
@@ -103,23 +121,39 @@ public class VoiceDownloadManager {
         Handler mainHandler = new Handler(Looper.getMainLooper());
         List<Long> allDownloadIds = new ArrayList<>();
 
-        List<String> toDownload = new ArrayList<>();
+        Map<String, List<String>> missingByLang = new LinkedHashMap<>();
+        int totalFileCount = 0;
         for (String lang : langCodes) {
-            if (isVoiceAvailable(lang) && !isVoiceDownloaded(appContext, lang)) {
-                toDownload.add(lang);
+            if (!PiperVoiceCatalog.isAvailable(lang)) continue;
+            List<String> missing = new ArrayList<>();
+            for (String file : PiperVoiceCatalog.requiredFiles(lang)) {
+                if (!PiperVoiceCatalog.voiceFileExists(appContext, file)) {
+                    missing.add(file);
+                }
+            }
+            if (!missing.isEmpty()) {
+                missingByLang.put(lang, missing);
+                totalFileCount += missing.size();
             }
         }
 
-        if (toDownload.isEmpty()) {
+        if (missingByLang.isEmpty()) {
             mainHandler.post(callback::onAllComplete);
             return allDownloadIds;
         }
 
-        Map<Long, String> downloadIdToLang = new HashMap<>();
-        /* Track which downloads are still in progress for polling */
-        ConcurrentHashMap<String, Long> pendingDownloads = new ConcurrentHashMap<>();
-        AtomicInteger completedCount = new AtomicInteger(0);
-        int totalCount = toDownload.size();
+        /* filesById is the single source of truth keyed by DownloadManager id.
+         * langStates holds direct FileState references so the polling loop never does a string lookup.
+         * remainingFiles is set to the planned count up front so a fast download can't fire
+         * onComplete(lang) before the rest of the files in that lang are even enqueued. */
+        final ConcurrentHashMap<Long, FileState> filesById = new ConcurrentHashMap<>();
+        final Map<String, LangState> langStates = new HashMap<>();
+        for (Map.Entry<String, List<String>> e : missingByLang.entrySet()) {
+            langStates.put(e.getKey(), new LangState(e.getValue().size()));
+        }
+
+        final AtomicInteger completedFileCount = new AtomicInteger(0);
+        final int totalFileCountFinal = totalFileCount;
 
         final BroadcastReceiver[] receiverHolder = {null};
         BroadcastReceiver receiver = new BroadcastReceiver() {
@@ -127,10 +161,8 @@ public class VoiceDownloadManager {
             public void onReceive(Context ctx, Intent intent) {
                 if (intent.getAction() == null || !DownloadManager.ACTION_DOWNLOAD_COMPLETE.equals(intent.getAction())) return;
                 long downloadId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1);
-                String lang = downloadIdToLang.get(downloadId);
-                if (lang == null) return;
-
-                pendingDownloads.remove(lang);
+                final FileState fs = filesById.get(downloadId);
+                if (fs == null) return;
 
                 DownloadManager dm = appContext.getSystemService(DownloadManager.class);
                 int status = -1;
@@ -145,32 +177,38 @@ public class VoiceDownloadManager {
                 }
 
                 if (status == DownloadManager.STATUS_SUCCESSFUL) {
-                    String filename = VoiceTranslationService.PIPER_VOICE_MODELS.get(lang);
-                    File from = new File(appContext.getExternalFilesDir(null), filename);
-                    File to = new File(appContext.getFilesDir(), filename);
+                    File from = new File(appContext.getExternalFilesDir(null), fs.filename);
+                    File to = new File(appContext.getFilesDir(), fs.filename);
                     FileTools.moveFile(from, to, new FileTools.MoveFileCallback() {
                         @Override
                         public void onSuccess() {
-                            Log.i(TAG, "Voice downloaded: " + lang);
-                            mainHandler.post(() -> callback.onComplete(lang));
+                            Log.i(TAG, "Voice file downloaded: " + fs.filename);
+                            fs.percent = 100;
+                            fs.dirty = true;
+                            PiperVoiceCatalog.invalidate(fs.lang);
+                            LangState ls = langStates.get(fs.lang);
+                            if (ls != null && ls.remainingFiles.decrementAndGet() == 0) {
+                                Log.i(TAG, "All voice files complete for: " + fs.lang);
+                                mainHandler.post(() -> callback.onComplete(fs.lang));
+                            }
                             checkAllDone();
                         }
                         @Override
                         public void onFailure() {
-                            Log.e(TAG, "Transfer failed: " + lang);
-                            mainHandler.post(() -> callback.onError(lang, "File transfer failed"));
+                            Log.e(TAG, "Transfer failed: " + fs.filename);
+                            mainHandler.post(() -> callback.onError(fs.lang, "File transfer failed"));
                             checkAllDone();
                         }
                     });
                 } else {
-                    Log.e(TAG, "Download failed: " + lang + " status=" + status);
-                    mainHandler.post(() -> callback.onError(lang, "Download failed"));
+                    Log.e(TAG, "Download failed: " + fs.filename + " status=" + status);
+                    mainHandler.post(() -> callback.onError(fs.lang, "Download failed"));
                     checkAllDone();
                 }
             }
 
             private void checkAllDone() {
-                if (completedCount.incrementAndGet() >= totalCount) {
+                if (completedFileCount.incrementAndGet() >= totalFileCountFinal) {
                     mainHandler.post(callback::onAllComplete);
                     try { appContext.unregisterReceiver(receiverHolder[0]); } catch (Exception ignored) {}
                 }
@@ -185,42 +223,79 @@ public class VoiceDownloadManager {
             appContext.registerReceiver(receiver, filter);
         }
 
-        for (String lang : toDownload) {
-            String filename = VoiceTranslationService.PIPER_VOICE_MODELS.get(lang);
-            String url = DownloadFragment.PIPER_BASE + filename;
-            long downloadId = downloader.downloadModel(url, filename);
-            downloadIdToLang.put(downloadId, lang);
-            pendingDownloads.put(lang, downloadId);
-            allDownloadIds.add(downloadId);
-            Log.i(TAG, "Started: " + lang + " (id=" + downloadId + ")");
+        for (Map.Entry<String, List<String>> e : missingByLang.entrySet()) {
+            String lang = e.getKey();
+            LangState ls = langStates.get(lang);
+            for (String filename : e.getValue()) {
+                String url = DownloadFragment.PIPER_BASE + filename;
+                long downloadId = downloader.downloadModel(url, filename);
+                FileState fs = new FileState(filename, lang, downloadId);
+                filesById.put(downloadId, fs);
+                ls.files.add(fs);
+                allDownloadIds.add(downloadId);
+                Log.i(TAG, "Started: " + filename + " (lang=" + lang + ", id=" + downloadId + ")");
+            }
         }
 
-        /* Progress polling — only queries pending downloads, stops when all done */
         new Thread("voice-download-progress") {
             @Override
             public void run() {
                 DownloadManager dm = appContext.getSystemService(DownloadManager.class);
-                while (completedCount.get() < totalCount) {
+                while (completedFileCount.get() < totalFileCountFinal) {
                     try { Thread.sleep(500); } catch (InterruptedException e) { break; }
-                    for (Map.Entry<String, Long> entry : pendingDownloads.entrySet()) {
-                        String lang = entry.getKey();
-                        long id = entry.getValue();
-                        Cursor cursor = dm.query(new DownloadManager.Query().setFilterById(id));
-                        try {
-                            if (cursor != null && cursor.moveToFirst()) {
-                                int bytesIdx = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
-                                int totalIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
-                                if (bytesIdx >= 0 && totalIdx >= 0) {
-                                    long downloaded = cursor.getLong(bytesIdx);
-                                    long total = cursor.getLong(totalIdx);
-                                    if (total > 0) {
-                                        int percent = (int) ((downloaded * 100) / total);
-                                        mainHandler.post(() -> callback.onProgress(lang, percent));
-                                    }
+
+                    List<FileState> pending = new ArrayList<>();
+                    for (FileState fs : filesById.values()) {
+                        if (fs.percent < 100) pending.add(fs);
+                    }
+                    if (pending.isEmpty()) continue;
+
+                    long[] ids = new long[pending.size()];
+                    for (int i = 0; i < pending.size(); i++) ids[i] = pending.get(i).downloadId;
+
+                    Cursor cursor = dm.query(new DownloadManager.Query().setFilterById(ids));
+                    try {
+                        if (cursor != null) {
+                            int idIdx = cursor.getColumnIndex(DownloadManager.COLUMN_ID);
+                            int bytesIdx = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
+                            int totalIdx = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
+                            while (cursor.moveToNext()) {
+                                long id = cursor.getLong(idIdx);
+                                long downloaded = cursor.getLong(bytesIdx);
+                                long total = cursor.getLong(totalIdx);
+                                if (total <= 0) continue;
+                                FileState fs = filesById.get(id);
+                                if (fs == null) continue;
+                                int pct = (int) ((downloaded * 100) / total);
+                                if (pct != fs.percent) {
+                                    fs.percent = pct;
+                                    fs.dirty = true;
                                 }
                             }
-                        } finally {
-                            if (cursor != null) cursor.close();
+                        }
+                    } finally {
+                        if (cursor != null) cursor.close();
+                    }
+
+                    for (Map.Entry<String, LangState> e : langStates.entrySet()) {
+                        final String lang = e.getKey();
+                        LangState ls = e.getValue();
+                        boolean anyDirty = false;
+                        int sum = 0;
+                        for (FileState fs : ls.files) {
+                            if (fs.dirty) anyDirty = true;
+                            sum += fs.percent;
+                        }
+                        if (!anyDirty) continue;
+
+                        int avg = sum / ls.files.size();
+                        if (avg != ls.lastPostedPercent) {
+                            ls.lastPostedPercent = avg;
+                            final int avgFinal = avg;
+                            mainHandler.post(() -> callback.onProgress(lang, avgFinal));
+                        }
+                        for (FileState fs : ls.files) {
+                            fs.dirty = false;
                         }
                     }
                 }

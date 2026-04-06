@@ -34,6 +34,13 @@
     <string name="captions_placeholder">Captions will appear here</string>
     <string name="change_languages">Change Languages</string>
 
+    <!-- Voice gender -->
+    <string name="section_voice">Voice</string>
+    <string name="voice_gender_title">Speaker voice</string>
+    <string name="voice_gender_description">Match TTS voice to speaker gender (applies where supported)</string>
+    <string name="voice_gender_male">Male</string>
+    <string name="voice_gender_female">Female</string>
+
     <!-- Caption saving -->
     <string name="section_captions">Captions</string>
     <string name="caption_save_title">Save Captions</string>

@@ -32,6 +32,8 @@ import nie.translator.vtranslator.voice_translation.neural_networks.voice.Record
 
 public class Global extends Application implements DefaultLifecycleObserver {
     public static final int DEFAULT_BEAM_SIZE = 1;
+
+    public enum Gender { MALE, FEMALE }
     private ArrayList<CustomLocale> languages = new ArrayList<>();
     private ArrayList<CustomLocale> translatorLanguages = new ArrayList<>();
     private ArrayList<CustomLocale> ttsLanguages = new ArrayList<>();
@@ -62,6 +64,7 @@ public class Global extends Application implements DefaultLifecycleObserver {
     private int preferredOutputDeviceType = -1;
     private int beamSize = -1;
     private int captionSaveEnabled = -1;
+    private Gender speakerGender = null;
     private int amplitudeThreshold = Recorder.DEFAULT_AMPLITUDE_THRESHOLD;
     private boolean isForeground = false;
     @Nullable
@@ -750,6 +753,23 @@ public class Global extends Application implements DefaultLifecycleObserver {
         final SharedPreferences sharedPreferences = this.getSharedPreferences("default", Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = sharedPreferences.edit();
         editor.putBoolean("captionSaveEnabled", enabled);
+        editor.apply();
+    }
+
+    public Gender getSpeakerGender() {
+        if (speakerGender == null) {
+            final SharedPreferences sharedPreferences = this.getSharedPreferences("default", Context.MODE_PRIVATE);
+            int ordinal = sharedPreferences.getInt("speakerGender", Gender.MALE.ordinal());
+            speakerGender = Gender.values()[ordinal];
+        }
+        return speakerGender;
+    }
+
+    public void setSpeakerGender(Gender gender) {
+        speakerGender = gender;
+        final SharedPreferences sharedPreferences = this.getSharedPreferences("default", Context.MODE_PRIVATE);
+        SharedPreferences.Editor editor = sharedPreferences.edit();
+        editor.putInt("speakerGender", gender.ordinal());
         editor.apply();
     }
 

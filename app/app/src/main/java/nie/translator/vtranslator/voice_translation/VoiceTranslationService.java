@@ -25,6 +25,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -40,6 +44,7 @@ import nie.translator.vtranslator.tools.AudioDeviceManager;
 import nie.translator.vtranslator.tools.VoiceDownloadManager;
 import nie.translator.vtranslator.tools.FileTools;
 import nie.translator.vtranslator.tools.PiperTtsEngine;
+import nie.translator.vtranslator.tools.PiperVoiceCatalog;
 import nie.translator.vtranslator.tools.Timer;
 import nie.translator.vtranslator.tools.CustomLocale;
 import nie.translator.vtranslator.tools.TTS;
@@ -117,43 +122,6 @@ public abstract class VoiceTranslationService extends GeneralService {
 
     /* Piper TTS — natural-sounding neural voices via sherpa-onnx */
     private final ConcurrentHashMap<String, PiperTtsEngine> piperEngines = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Boolean> piperVoiceAvailableCache = new ConcurrentHashMap<>();
-    public static final HashMap<String, String> PIPER_VOICE_MODELS = new HashMap<>();
-    static {
-        PIPER_VOICE_MODELS.put("ar", "ar_JO-kareem-medium.onnx");
-        PIPER_VOICE_MODELS.put("ca", "ca_ES-upc_ona-medium.onnx");
-        PIPER_VOICE_MODELS.put("cs", "cs_CZ-jirka-medium.onnx");
-        PIPER_VOICE_MODELS.put("da", "da_DK-talesyntese-medium.onnx");
-        PIPER_VOICE_MODELS.put("de", "de_DE-thorsten-medium.onnx");
-        PIPER_VOICE_MODELS.put("el", "el_GR-rapunzelina-low.onnx");
-        PIPER_VOICE_MODELS.put("en", "en_US-lessac-medium.onnx");
-        PIPER_VOICE_MODELS.put("es", "es_ES-davefx-medium.onnx");
-        PIPER_VOICE_MODELS.put("fa", "fa_IR-gyro-medium.onnx");
-        PIPER_VOICE_MODELS.put("fi", "fi_FI-harri-medium.onnx");
-        PIPER_VOICE_MODELS.put("fr", "fr_FR-siwis-medium.onnx");
-        PIPER_VOICE_MODELS.put("hi", "hi_IN-rohan-medium.onnx");
-        PIPER_VOICE_MODELS.put("hu", "hu_HU-anna-medium.onnx");
-        PIPER_VOICE_MODELS.put("id", "id_ID-news_tts-medium.onnx");
-        PIPER_VOICE_MODELS.put("is", "is_IS-bui-medium.onnx");
-        PIPER_VOICE_MODELS.put("it", "it_IT-paola-medium.onnx");
-        PIPER_VOICE_MODELS.put("ka", "ka_GE-natia-medium.onnx");
-        PIPER_VOICE_MODELS.put("kk", "kk_KZ-issai-high.onnx");
-        PIPER_VOICE_MODELS.put("lv", "lv_LV-aivars-medium.onnx");
-        PIPER_VOICE_MODELS.put("ml", "ml_IN-meera-medium.onnx");
-        PIPER_VOICE_MODELS.put("ne", "ne_NP-google-medium.onnx");
-        PIPER_VOICE_MODELS.put("nl", "nl_NL-miro-high.onnx");
-        PIPER_VOICE_MODELS.put("no", "no_NO-talesyntese-medium.onnx");
-        PIPER_VOICE_MODELS.put("pl", "pl_PL-gosia-medium.onnx");
-        PIPER_VOICE_MODELS.put("pt", "pt_BR-faber-medium.onnx");
-        PIPER_VOICE_MODELS.put("ru", "ru_RU-irina-medium.onnx");
-        PIPER_VOICE_MODELS.put("sk", "sk_SK-lili-medium.onnx");
-        PIPER_VOICE_MODELS.put("sr", "sr_RS-serbski_institut-medium.onnx");
-        PIPER_VOICE_MODELS.put("sv", "sv_SE-nst-medium.onnx");
-        PIPER_VOICE_MODELS.put("sw", "sw_CD-lanfrica-medium.onnx");
-        PIPER_VOICE_MODELS.put("tr", "tr_TR-fahrettin-medium.onnx");
-        PIPER_VOICE_MODELS.put("uk", "uk_UA-ukrainian_tts-medium.onnx");
-        PIPER_VOICE_MODELS.put("vi", "vi_VN-vais1000-medium.onnx");
-    }
 
     /* synthesizeToFile support: utterance metadata */
     private final AtomicLong utteranceCounter = new AtomicLong(0);
@@ -341,7 +309,8 @@ public abstract class VoiceTranslationService extends GeneralService {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (notification == null) {
+        /* intent is null when the system restarts a sticky service after process death */
+        if (notification == null && intent != null) {
             notification = intent.getParcelableExtra("notification");
         }
         if (notification != null) {
@@ -459,8 +428,9 @@ public abstract class VoiceTranslationService extends GeneralService {
             if (isAudioMute) return;
 
             String langCode = language.getLanguage();
-            /* Lazily load engine — handles mid-session voice downloads */
-            PiperTtsEngine engine = hasPiperVoice(langCode) ? getPiperEngine(langCode) : null;
+            Global.Gender gender = ((Global) getApplication()).getSpeakerGender();
+            String modelFile = PiperVoiceCatalog.resolveAvailableVoice(this, langCode, gender);
+            PiperTtsEngine engine = (modelFile != null) ? getPiperEngine(modelFile) : null;
             if (engine != null) {
                 /* Piper TTS: streaming — first audio chunk arrives in ~200ms */
                 utterancesCurrentlySpeaking++;
@@ -514,57 +484,59 @@ public abstract class VoiceTranslationService extends GeneralService {
         }
     }
 
-    private boolean hasPiperVoice(String langCode) {
-        Boolean cached = piperVoiceAvailableCache.get(langCode);
-        if (cached != null) return cached;
-
-        boolean available = VoiceDownloadManager.isVoiceDownloaded(this, langCode);
-        piperVoiceAvailableCache.put(langCode, available);
-        return available;
-    }
-
-    public void invalidateVoiceCache() {
-        piperVoiceAvailableCache.clear();
-    }
-
-    private PiperTtsEngine getPiperEngine(String langCode) {
-        /* computeIfAbsent is atomic on ConcurrentHashMap — prevents duplicate engine
-         * construction when preloadPiperEngines and speak() race on the same langCode */
-        return piperEngines.computeIfAbsent(langCode, lang -> {
+    /* computeIfAbsent is atomic — prevents duplicate engine construction when preload and speak() race on the same file. */
+    private PiperTtsEngine getPiperEngine(String modelFile) {
+        return piperEngines.computeIfAbsent(modelFile, file -> {
             ensurePiperAssetsExtracted();
             String filesDir = getFilesDir().getPath();
-            String modelFile = PIPER_VOICE_MODELS.get(lang);
             return new PiperTtsEngine(
-                    filesDir + "/" + modelFile,
+                    filesDir + "/" + file,
                     filesDir + "/piper-tokens.txt",
                     filesDir + "/espeak-ng-data"
             );
         });
     }
 
-    /**
-     * Pre-load Piper TTS engines for target languages on a background thread.
-     * Called from WalkieTalkieService.onStartCommand() when target languages are known.
-     * By the time the first translation finishes (~2s), the engine should be loaded.
-     */
+    /* Preloads both gender variants so mid-session gender toggles are instant. Stale engines
+     * from the previous target are evicted via ttsExecutor — synthesizeStreaming() is blocking
+     * and runs on that same single-threaded executor, so eviction never races a live synthesis. */
     protected void preloadPiperEngines(CustomLocale target1, CustomLocale target2) {
+        PiperVoiceCatalog.invalidateAll();
+
+        Set<String> activeFiles = new HashSet<>();
+        if (target1 != null) activeFiles.addAll(PiperVoiceCatalog.requiredFiles(target1.getLanguage()));
+        if (target2 != null) activeFiles.addAll(PiperVoiceCatalog.requiredFiles(target2.getLanguage()));
+
+        ttsExecutor.execute(() -> {
+            Iterator<Map.Entry<String, PiperTtsEngine>> it = piperEngines.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, PiperTtsEngine> entry = it.next();
+                if (!activeFiles.contains(entry.getKey())) {
+                    entry.getValue().release();
+                    it.remove();
+                    Log.i("VoxSwap", "Evicted stale Piper engine: " + entry.getKey());
+                }
+            }
+        });
+
         new Thread("piper-preload") {
             @Override
             public void run() {
                 ensurePiperAssetsExtracted();
-                if (target1 != null) {
-                    String lang = target1.getLanguage();
-                    if (hasPiperVoice(lang)) {
-                        getPiperEngine(lang);
-                        Log.i("VoxSwap", "Piper engine pre-loaded for " + lang);
-                    }
-                }
-                if (target2 != null) {
-                    String lang = target2.getLanguage();
-                    if (hasPiperVoice(lang)) {
-                        getPiperEngine(lang);
-                        Log.i("VoxSwap", "Piper engine pre-loaded for " + lang);
-                    }
+                preload(target1);
+                preload(target2);
+            }
+
+            private void preload(@Nullable CustomLocale target) {
+                if (target == null) return;
+                String lang = target.getLanguage();
+                PiperVoiceCatalog.Variants variants = PiperVoiceCatalog.getVariants(lang);
+                for (String modelFile : PiperVoiceCatalog.requiredFiles(lang)) {
+                    if (!PiperVoiceCatalog.voiceFileExists(VoiceTranslationService.this, modelFile)) continue;
+                    getPiperEngine(modelFile);
+                    String label = variants == null ? ""
+                            : modelFile.equals(variants.male) ? " (male)" : " (female)";
+                    Log.i("VoxSwap", "Piper engine pre-loaded for " + lang + label);
                 }
             }
         }.start();
